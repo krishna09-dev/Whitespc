@@ -1,0 +1,148 @@
+@using whitespc.Models
+@inject NavigationManager NavigationManager
+@inject JournalService JournalService
+
+<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow group relative">
+    <!-- Pin/Favorite Indicators -->
+    @if (Entry.IsPinned)
+    {
+        <div class="absolute -top-2 -left-2 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-md" title="Pinned">
+            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+            </svg>
+        </div>
+    }
+    
+    <div class="flex items-start gap-4 cursor-pointer" @onclick="ViewEntry">
+        <!-- Mood Icon -->
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 mood-@Entry.PrimaryMoodCategory.ToString().ToLower()">
+            <span class="text-2xl">@Entry.PrimaryMoodEmoji</span>
+        </div>
+        
+        <!-- Content -->
+        <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-2">
+                        @Entry.Title
+                        @if (Entry.IsFavorite)
+                        {
+                            <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        }
+                    </h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                        @Entry.EntryDate.ToString("MMMM d, yyyy") · @Entry.WordCount words
+                    </p>
+                </div>
+                
+                <!-- Secondary moods -->
+                @if (Entry.SecondaryMood1.HasValue || Entry.SecondaryMood2.HasValue)
+                {
+                    <div class="flex gap-1">
+                        @if (Entry.SecondaryMood1.HasValue)
+                        {
+                            <span class="text-lg" title="@Entry.SecondaryMood1.Value">@Entry.SecondaryMood1.Value.GetEmoji()</span>
+                        }
+                        @if (Entry.SecondaryMood2.HasValue)
+                        {
+                            <span class="text-lg" title="@Entry.SecondaryMood2.Value">@Entry.SecondaryMood2.Value.GetEmoji()</span>
+                        }
+                    </div>
+                }
+            </div>
+            
+            <!-- Preview -->
+            <p class="text-slate-600 dark:text-slate-300 mt-2 line-clamp-2 text-sm">
+                @GetPreview()
+            </p>
+            
+            <!-- Tags -->
+            @if (Entry.Tags.Any())
+            {
+                <div class="flex flex-wrap gap-1.5 mt-3">
+                    @foreach (var tag in Entry.Tags.Take(5))
+                    {
+                        <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-xs">
+                            @tag.Name
+                        </span>
+                    }
+                    @if (Entry.Tags.Count > 5)
+                    {
+                        <span class="px-2 py-0.5 text-slate-400 text-xs">+@(Entry.Tags.Count - 5) more</span>
+                    }
+                </div>
+            }
+        </div>
+        
+        <!-- Arrow -->
+        <svg class="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+        <button @onclick="ToggleFavorite" @onclick:stopPropagation="true"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(Entry.IsFavorite ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" : "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400")">
+            <svg class="w-4 h-4" fill="@(Entry.IsFavorite ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            @(Entry.IsFavorite ? "Favorited" : "Favorite")
+        </button>
+        
+        <button @onclick="TogglePinned" @onclick:stopPropagation="true"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors @(Entry.IsPinned ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" : "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400")">
+            <svg class="w-4 h-4" fill="@(Entry.IsPinned ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+            </svg>
+            @(Entry.IsPinned ? "Pinned" : "Pin")
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public JournalEntry Entry { get; set; } = null!;
+    [Parameter] public EventCallback OnEntryUpdated { get; set; }
+
+    private string GetPreview()
+    {
+        var content = Entry.Content;
+        if (string.IsNullOrWhiteSpace(content))
+            return "";
+            
+        // Remove markdown formatting for preview
+        content = System.Text.RegularExpressions.Regex.Replace(content, @"[#*_`\[\]()]", "");
+        content = System.Text.RegularExpressions.Regex.Replace(content, @"\s+", " ");
+        
+        return content.Length > 200 ? content.Substring(0, 200) + "..." : content;
+    }
+
+    private void ViewEntry()
+    {
+        // Navigate to entry detail or today if it's today's entry
+        if (Entry.EntryDate == DateOnly.FromDateTime(DateTime.Today))
+        {
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            NavigationManager.NavigateTo($"/calendar");
+        }
+    }
+
+    private async Task ToggleFavorite()
+    {
+        await JournalService.ToggleFavoriteAsync(Entry.Id);
+        Entry.IsFavorite = !Entry.IsFavorite;
+        await OnEntryUpdated.InvokeAsync();
+    }
+
+    private async Task TogglePinned()
+    {
+        await JournalService.TogglePinnedAsync(Entry.Id);
+        Entry.IsPinned = !Entry.IsPinned;
+        await OnEntryUpdated.InvokeAsync();
+    }
+}
