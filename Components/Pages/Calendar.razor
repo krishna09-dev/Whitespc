@@ -1,0 +1,453 @@
+@page "/calendar"
+@inject JournalService JournalService
+@inject NavigationManager NavigationManager
+
+<div class="space-y-6 page-enter">
+    <!-- Calendar Header -->
+    <div class="flex items-center justify-between animate-fade-in-up">
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Calendar View</h2>
+        <div class="flex items-center gap-2">
+            <button @onclick="PreviousMonth" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all btn-press hover:scale-110">
+                <svg class="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <span class="text-lg font-semibold text-slate-800 dark:text-slate-100 min-w-[180px] text-center">
+                @CurrentMonth.ToString("MMMM yyyy")
+            </span>
+            <button @onclick="NextMonth" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all btn-press hover:scale-110">
+                <svg class="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+            <button @onclick="GoToToday" class="ml-2 px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all btn-press hover:scale-105">
+                Today
+            </button>
+        </div>
+    </div>
+
+    <!-- Calendar Grid -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up stagger-1 hover-lift">
+        <!-- Day Headers -->
+        <div class="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700">
+            @foreach (var day in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+            {
+                <div class="py-3 text-center text-sm font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50">
+                    @day
+                </div>
+            }
+        </div>
+
+        <!-- Calendar Days -->
+        <div class="grid grid-cols-7">
+            @foreach (var day in CalendarDays)
+            {
+                var isToday = day.Date == DateOnly.FromDateTime(DateTime.Today);
+                var isCurrentMonth = day.Date.Month == CurrentMonth.Month;
+                var hasEntry = EntryDates.Contains(day.Date);
+                
+                <button @onclick="() => SelectDate(day.Date)" 
+                        class="calendar-day aspect-square p-1.5 border-b border-r border-slate-100 dark:border-slate-700 
+                               @(isCurrentMonth ? "" : "bg-slate-50 dark:bg-slate-900/30")
+                               @(isToday ? "today" : "")
+                               @(hasEntry ? "has-entry" : "")
+                               @(SelectedDate == day.Date ? "ring-2 ring-primary-500 ring-inset" : "")
+                               hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors relative">
+                    <div class="flex flex-col h-full items-center">
+                        <span class="text-sm font-medium @(isCurrentMonth ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-600") @(isToday ? "text-primary-600 dark:text-primary-400" : "")">
+                            @day.Date.Day
+                        </span>
+                        @if (hasEntry)
+                        {
+                            <svg class="w-4 h-4 text-amber-500 mt-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                            </svg>
+                        }
+                    </div>
+                </button>
+            }
+        </div>
+    </div>
+
+
+    <!-- Selected Date Entry Preview -->
+    @if (SelectedDate.HasValue)
+    {
+        <div class="animate-slide-up">
+            @if (SelectedDateEntries.Any())
+            {
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            @SelectedDate.Value.ToString("MMMM d, yyyy")
+                        </h3>
+                        <span class="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs rounded-full">
+                            @SelectedDateEntries.Count @(SelectedDateEntries.Count == 1 ? "entry" : "entries")
+                        </span>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach (var entry in SelectedDateEntries)
+                        {
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex items-center gap-2 flex-1">
+                                        <span class="text-lg">@entry.PrimaryMood.GetEmoji()</span>
+                                        <h4 class="font-medium text-slate-800 dark:text-slate-100">@entry.Title</h4>
+                                        @if (entry.IsFavorite)
+                                        {
+                                            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                            </svg>
+                                        }
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <button @onclick="() => ViewEntry(entry)" title="View" class="p-1.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                        </button>
+                                        @if (entry.EntryDate == DateOnly.FromDateTime(DateTime.Today))
+                                        {
+                                            <button @onclick="() => EditSelectedEntry(entry)" title="Edit" class="p-1.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                </svg>
+                                            </button>
+                                        }
+                                        <button @onclick="() => ToggleFavorite(entry)" title="@(entry.IsFavorite ? "Remove from favorites" : "Add to favorites")" class="p-1.5 @(entry.IsFavorite ? "text-amber-500" : "text-slate-400 hover:text-amber-500") hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
+                                            <svg class="w-4 h-4" fill="@(entry.IsFavorite ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                            </svg>
+                                        </button>
+                                        <button @onclick="() => ConfirmDeleteEntry(entry)" title="Delete" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">@GetPreviewText(entry.Content)</p>
+                                <p class="text-xs text-slate-400 mt-2">@entry.CreatedAt.ToString("h:mm tt")</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">
+                    <div class="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <p class="text-slate-600 dark:text-slate-300 mb-1">No entry for @SelectedDate.Value.ToString("MMMM d, yyyy")</p>
+                    @if (SelectedDate.Value == DateOnly.FromDateTime(DateTime.Today))
+                    {
+                        <p class="text-sm text-slate-400 mb-4">Why not write about your day?</p>
+                        <button @onclick="WriteForSelectedDate" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm">
+                            Write Entry
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Legend -->
+    <div class="flex items-center justify-center gap-6 text-sm text-slate-500 dark:text-slate-400">
+        <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+            </svg>
+            <span>Has Entry</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded border-2 border-primary-500"></div>
+            <span>Today</span>
+        </div>
+    </div>
+</div>
+
+<!-- View Entry Modal -->
+@if (ViewingEntry != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @onclick="CloseViewModal">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4" @onclick:stopPropagation>
+            <!-- Header -->
+            <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">@ViewingEntry.Title</h2>
+                    <p class="text-sm text-slate-500 mt-1">@ViewingEntry.EntryDate.ToString("dddd, MMMM d, yyyy") at @ViewingEntry.CreatedAt.ToString("h:mm tt")</p>
+                </div>
+                <button @onclick="CloseViewModal" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Content -->
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <!-- Moods Section -->
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Moods</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/30 rounded-full">
+                            <span class="text-xl">@ViewingEntry.PrimaryMood.GetEmoji()</span>
+                            <span class="text-sm text-primary-700 dark:text-primary-300 font-medium">@ViewingEntry.PrimaryMood</span>
+                        </div>
+                        @if (ViewingEntry.SecondaryMood1.HasValue)
+                        {
+                            <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
+                                <span class="text-lg">@ViewingEntry.SecondaryMood1.Value.GetEmoji()</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">@ViewingEntry.SecondaryMood1.Value</span>
+                            </div>
+                        }
+                        @if (ViewingEntry.SecondaryMood2.HasValue)
+                        {
+                            <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
+                                <span class="text-lg">@ViewingEntry.SecondaryMood2.Value.GetEmoji()</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">@ViewingEntry.SecondaryMood2.Value</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                
+                <!-- Tags Section -->
+                @if (ViewingEntry.Tags?.Any() == true)
+                {
+                    <div class="mb-6">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Tags</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach (var tag in ViewingEntry.Tags)
+                            {
+                                <span class="px-3 py-1 text-sm rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">@tag.Name</span>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                <!-- Content Section -->
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Content</p>
+                    <div class="prose prose-slate dark:prose-invert max-w-none">
+                        @((MarkupString)ViewingEntry.Content)
+                    </div>
+                </div>
+                
+                <!-- Meta Information -->
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="text-slate-400 dark:text-slate-500">Word Count</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium">@ViewingEntry.WordCount words</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 dark:text-slate-500">Last Updated</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium">@ViewingEntry.UpdatedAt.ToString("MMM d, yyyy h:mm tt")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer Actions -->
+            <div class="flex items-center justify-center p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <button @onclick="CloseViewModal" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (ShowDeleteConfirm && EntryToDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @onclick="() => ShowDeleteConfirm = false">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-6 m-4" @onclick:stopPropagation>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Delete Entry?</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mb-6">This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button @onclick="() => ShowDeleteConfirm = false" class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        Cancel
+                    </button>
+                    <button @onclick="DeleteEntry" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DateTime CurrentMonth { get; set; } = DateTime.Today;
+    private DateOnly? SelectedDate { get; set; }
+private List<JournalEntry> SelectedDateEntries { get; set; } = new();
+private List<DateOnly> EntryDates { get; set; } = new();
+private Dictionary<DateOnly, JournalEntry> EntriesCache { get; set; } = new();
+private List<CalendarDay> CalendarDays { get; set; } = new();
+    
+// Modal states
+private JournalEntry? ViewingEntry { get; set; }
+private JournalEntry? EntryToDelete { get; set; }
+private bool ShowDeleteConfirm { get; set; }
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadCalendarDataAsync();
+}
+
+private async Task LoadCalendarDataAsync()
+{
+    EntryDates = await JournalService.GetAllEntryDatesAsync();
+        
+    // Load entries for current month
+    var startOfMonth = new DateOnly(CurrentMonth.Year, CurrentMonth.Month, 1);
+    var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+        
+    var entries = await JournalService.GetEntriesAsync(startDate: startOfMonth, endDate: endOfMonth, pageSize: 100);
+    EntriesCache = entries
+        .GroupBy(e => e.EntryDate)
+        .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.CreatedAt).First());
+        
+    GenerateCalendarDays();
+}
+
+    private void GenerateCalendarDays()
+    {
+        CalendarDays.Clear();
+        
+        var firstDayOfMonth = new DateOnly(CurrentMonth.Year, CurrentMonth.Month, 1);
+        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+        
+        // Start from the Sunday of the week containing the first day
+        var startDate = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek);
+        
+        // Generate 6 weeks (42 days) to fill the calendar
+        for (int i = 0; i < 42; i++)
+        {
+            var date = startDate.AddDays(i);
+            EntriesCache.TryGetValue(date, out var entry);
+            CalendarDays.Add(new CalendarDay { Date = date, Entry = entry });
+        }
+    }
+
+    private async Task SelectDate(DateOnly date)
+    {
+        SelectedDate = date;
+        SelectedDateEntries = await JournalService.GetEntriesByDateAsync(date);
+    }
+
+    private void PreviousMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(-1);
+        _ = LoadCalendarDataAsync();
+        SelectedDate = null;
+        SelectedDateEntries.Clear();
+    }
+
+    private void NextMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(1);
+        _ = LoadCalendarDataAsync();
+        SelectedDate = null;
+        SelectedDateEntries.Clear();
+    }
+
+    private void GoToToday()
+    {
+        CurrentMonth = DateTime.Today;
+        _ = LoadCalendarDataAsync();
+        _ = SelectDate(DateOnly.FromDateTime(DateTime.Today));
+    }
+
+    private void EditSelectedEntry(JournalEntry entry)
+    {
+        // Navigate to home with entry ID to edit
+        NavigationManager.NavigateTo($"/?edit={entry.Id}");
+    }
+
+    private void WriteForSelectedDate()
+    {
+        // Navigate to home with new entry mode for selected date
+        if (SelectedDate.HasValue)
+        {
+            NavigationManager.NavigateTo($"/?new=true&date={SelectedDate.Value:yyyy-MM-dd}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/?new=true");
+        }
+    }
+
+    private void ViewEntry(JournalEntry entry)
+    {
+        ViewingEntry = entry;
+    }
+
+    private void CloseViewModal()
+    {
+        ViewingEntry = null;
+    }
+
+    private async Task ToggleFavorite(JournalEntry entry)
+    {
+        entry.IsFavorite = !entry.IsFavorite;
+        await JournalService.UpdateEntryAsync(entry);
+    }
+
+    private void ConfirmDeleteEntry(JournalEntry entry)
+    {
+        EntryToDelete = entry;
+        ShowDeleteConfirm = true;
+    }
+
+    private async Task DeleteEntry()
+    {
+        if (EntryToDelete != null)
+        {
+            await JournalService.DeleteEntryAsync(EntryToDelete.Id);
+            SelectedDateEntries.Remove(EntryToDelete);
+            EntryToDelete = null;
+            ShowDeleteConfirm = false;
+            
+            // Reload calendar data
+            await LoadCalendarDataAsync();
+            if (SelectedDate.HasValue)
+            {
+                await SelectDate(SelectedDate.Value);
+            }
+        }
+    }
+
+    private string GetPreviewText(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "";
+        
+        var text = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]+>", " ");
+        text = System.Net.WebUtility.HtmlDecode(text);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+        
+        if (text.Length > 100)
+        {
+            text = text.Substring(0, 100) + "...";
+        }
+        
+        return text;
+    }
+
+    private class CalendarDay
+    {
+        public DateOnly Date { get; set; }
+        public JournalEntry? Entry { get; set; }
+    }
+}
