@@ -1,0 +1,382 @@
+@inject SecurityService SecurityService
+@inject MotivationService MotivationService
+@inject ThemeService ThemeService
+
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <!-- Background Pattern -->
+    <div class="absolute inset-0 opacity-5">
+        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;0.4&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+    
+    <!-- Animated Background Orbs -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-20 -right-20 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl animate-float"></div>
+        <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-primary-700/10 rounded-full blur-3xl animate-float" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div class="relative w-full max-w-md mx-4 animate-fade-in-up">
+        <!-- Logo -->
+        <div class="w-24 h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-primary-500/30 mb-6 animate-bounce-subtle">
+            <span class="text-white font-bold text-4xl">W</span>
+        </div>
+
+        <!-- Lock Card -->
+        <div class="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl animate-scale-in">
+            @if (IsLockedOut)
+            {
+                <!-- Lockout State -->
+                <div class="text-center animate-fade-in">
+                    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-wiggle">
+                        <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-white mb-2">Too Many Attempts</h2>
+                    <p class="text-slate-400 mb-4">Please wait before trying again</p>
+                    <div class="text-4xl font-mono text-primary-400 animate-pulse-soft">@LockoutRemainingSeconds s</div>
+                </div>
+            }
+            else if (ShowRecovery)
+            {
+                <!-- Recovery Flow -->
+                <div class="animate-fade-in">
+                    <button @onclick="() => ShowRecovery = false" class="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition-colors btn-press">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Back
+                    </button>
+                    
+                    <h2 class="text-xl font-semibold text-white mb-6">Reset Your PIN</h2>
+                    
+                    @if (!string.IsNullOrEmpty(RecoveryError))
+                    {
+                        <div class="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm">
+                            @RecoveryError
+                        </div>
+                    }
+                    
+                    @if (RecoveryStep == 1)
+                    {
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-slate-300 mb-2">@SecurityQuestion1</label>
+                                <input type="text" @bind="RecoveryAnswer1" 
+                                       class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                                       placeholder="Your answer" />
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-300 mb-2">@SecurityQuestion2</label>
+                                <input type="text" @bind="RecoveryAnswer2" 
+                                       class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                                       placeholder="Your answer" />
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-300 mb-2">@SecurityQuestion3</label>
+                                <input type="text" @bind="RecoveryAnswer3" 
+                                       class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                                       placeholder="Your answer" />
+                            </div>
+                            <button @onclick="ValidateRecoveryAnswers" 
+                                    class="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+                                Verify Answers
+                            </button>
+                        </div>
+                    }
+                    else if (RecoveryStep == 2)
+                    {
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-slate-300 mb-2">New PIN</label>
+                                <div class="relative">
+                                    <input type="@(ShowNewPin ? "text" : "password")" @bind="NewPin" maxlength="5" inputmode="numeric"
+                                           class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-center tracking-[0.5em] text-2xl placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                                           style="caret-color: transparent;"
+                                           placeholder="�����" />
+                                    <button type="button" @onclick="() => ShowNewPin = !ShowNewPin" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
+                                        @if (ShowNewPin)
+                                        {
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                        }
+                                        else
+                                        {
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-300 mb-2">Confirm New PIN</label>
+                                <div class="relative">
+                                    <input type="@(ShowConfirmPin ? "text" : "password")" @bind="ConfirmNewPin" maxlength="5" inputmode="numeric"
+                                           class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-center tracking-[0.5em] text-2xl placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                                           style="caret-color: transparent;"
+                                           placeholder="�����" />
+                                    <button type="button" @onclick="() => ShowConfirmPin = !ShowConfirmPin" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
+                                        @if (ShowConfirmPin)
+                                        {
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                        }
+                                        else
+                                        {
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                            <button @onclick="ResetPin" 
+                                    class="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+                                Reset PIN
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <!-- PIN Entry - Simple Clean Design -->
+                <div class="text-center">
+                    <!-- Lock Icon -->
+                    <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                        <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    
+                    <h2 class="text-lg font-medium text-white mb-1">My Journal</h2>
+                    <p class="text-slate-500 text-sm mb-4">Enter PIN</p>
+                    
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <p class="text-red-400 text-sm mb-3">@ErrorMessage</p>
+                    }
+
+                    <!-- PIN Input with Visual Dots -->
+                    <div class="relative w-48 mx-auto mb-6">
+                        <!-- Actual input field - visible but with hidden cursor -->
+                        <input type="password" 
+                               @bind="Pin" 
+                               @bind:event="oninput"
+                               @onkeyup="OnPinKeyUp"
+                               @onfocus="() => IsPinFocused = true"
+                               @onblur="() => IsPinFocused = false"
+                               maxlength="5" 
+                               inputmode="numeric"
+                               pattern="[0-9]*"
+                               class="absolute inset-0 w-full h-full opacity-0 z-10"
+                               style="caret-color: transparent;"
+                               autofocus />
+                        <!-- Visual PIN dots that show progress -->
+                        <div class="flex justify-center gap-3 py-4 bg-white/5 border-2 rounded-xl transition-all duration-200 @(IsPinFocused ? "border-primary-500" : "border-white/10")">
+                            @for (int i = 0; i < 5; i++)
+                            {
+                                var filled = i < Pin.Length;
+                                <div class="w-4 h-4 rounded-full border-2 transition-all duration-200 @(filled ? "bg-primary-500 border-primary-500" : "border-slate-500")"></div>
+                            }
+                        </div>
+                    </div>
+                    
+                    <!-- Forgot PIN Link -->
+                    <button @onclick="StartRecovery" class="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+                        Reset PIN
+                    </button>
+                </div>
+            }
+        </div>
+
+        <!-- Daily Motivation -->
+        @if (ShowMotivation && !ShowRecovery && !IsLockedOut)
+        {
+            <div class="mt-6 text-center">
+                <p class="text-slate-400 text-sm italic px-4 leading-relaxed">
+                    "@DailyQuote"
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnUnlocked { get; set; }
+    
+    private ElementReference PinInputRef;
+    private string Pin { get; set; } = "";
+    private string ErrorMessage { get; set; } = "";
+    private bool IsLockedOut { get; set; }
+    private int LockoutRemainingSeconds { get; set; }
+    private System.Threading.Timer? LockoutTimer;
+    private bool IsPinFocused { get; set; } = false;
+    
+    // Recovery
+    private bool ShowRecovery { get; set; }
+    private int RecoveryStep { get; set; } = 1;
+    private string SecurityQuestion1 { get; set; } = "";
+    private string SecurityQuestion2 { get; set; } = "";
+    private string SecurityQuestion3 { get; set; } = "";
+    private string RecoveryAnswer1 { get; set; } = "";
+    private string RecoveryAnswer2 { get; set; } = "";
+    private string RecoveryAnswer3 { get; set; } = "";
+    private string NewPin { get; set; } = "";
+    private string ConfirmNewPin { get; set; } = "";
+    private string RecoveryError { get; set; } = "";
+    
+    // Motivation
+    private bool ShowMotivation { get; set; }
+    private string DailyQuote { get; set; } = "";
+    
+    // PIN visibility toggles for recovery
+    private bool ShowNewPin { get; set; } = false;
+    private bool ShowConfirmPin { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var settings = await SecurityService.GetSettingsAsync();
+        ShowMotivation = settings.ShowDailyMotivation;
+        DailyQuote = MotivationService.GetDailyQuote();
+        
+        var (questions, _, _) = await SecurityService.GetSecurityQuestionsAsync();
+        if (!string.IsNullOrEmpty(questions))
+        {
+            var qs = await SecurityService.GetSecurityQuestionsAsync();
+            SecurityQuestion1 = qs.Q1;
+            SecurityQuestion2 = qs.Q2;
+            SecurityQuestion3 = qs.Q3;
+        }
+        
+        await CheckLockoutStatus();
+    }
+
+    private async Task CheckLockoutStatus()
+    {
+        var (isLockedOut, remainingSeconds) = await SecurityService.CheckLockoutStatusAsync();
+        IsLockedOut = isLockedOut;
+        LockoutRemainingSeconds = remainingSeconds;
+        
+        if (IsLockedOut)
+        {
+            StartLockoutTimer();
+        }
+    }
+
+    private void StartLockoutTimer()
+    {
+        LockoutTimer?.Dispose();
+        LockoutTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                LockoutRemainingSeconds--;
+                if (LockoutRemainingSeconds <= 0)
+                {
+                    IsLockedOut = false;
+                    LockoutTimer?.Dispose();
+                }
+                StateHasChanged();
+            });
+        }, null, 1000, 1000);
+    }
+
+    private async Task OnPinKeyUp(KeyboardEventArgs e)
+    {
+        ErrorMessage = "";
+        
+        // Auto-validate when 5 digits entered
+        if (Pin.Length == 5)
+        {
+            await ValidatePin();
+        }
+    }
+
+    private async Task ValidatePin()
+    {
+        if (Pin.Length != 5)
+        {
+            ErrorMessage = "PIN must be exactly 5 digits";
+            return;
+        }
+        
+        
+        var (success, remainingAttempts, isLockedOut) = await SecurityService.ValidatePinAsync(Pin);
+        
+        if (success)
+        {
+            await OnUnlocked.InvokeAsync();
+        }
+        else if (isLockedOut)
+        {
+            IsLockedOut = true;
+            LockoutRemainingSeconds = 30;
+            StartLockoutTimer();
+            Pin = "";
+        }
+        else
+        {
+            ErrorMessage = $"Incorrect PIN. {remainingAttempts} attempts remaining.";
+            Pin = "";
+        }
+    }
+
+    private async Task StartRecovery()
+    {
+        var hasQuestions = await SecurityService.HasSecurityQuestionsAsync();
+        if (!hasQuestions)
+        {
+            ErrorMessage = "No recovery questions set. Contact support.";
+            return;
+        }
+        
+        ShowRecovery = true;
+        RecoveryStep = 1;
+        RecoveryError = "";
+    }
+
+    private async Task ValidateRecoveryAnswers()
+    {
+        RecoveryError = "";
+        
+        if (string.IsNullOrWhiteSpace(RecoveryAnswer1) || 
+            string.IsNullOrWhiteSpace(RecoveryAnswer2) || 
+            string.IsNullOrWhiteSpace(RecoveryAnswer3))
+        {
+            RecoveryError = "Please answer all questions.";
+            return;
+        }
+        
+        var valid = await SecurityService.ValidateSecurityAnswersAsync(
+            RecoveryAnswer1, RecoveryAnswer2, RecoveryAnswer3);
+        
+        if (valid)
+        {
+            RecoveryStep = 2;
+        }
+        else
+        {
+            RecoveryError = "Incorrect answers. Please try again.";
+        }
+    }
+
+    private async Task ResetPin()
+    {
+        RecoveryError = "";
+        
+        if (NewPin.Length < 4)
+        {
+            RecoveryError = "PIN must be at least 4 digits.";
+            return;
+        }
+        
+        if (NewPin != ConfirmNewPin)
+        {
+            RecoveryError = "PINs do not match.";
+            return;
+        }
+        
+        await SecurityService.ResetPinWithRecoveryAsync(NewPin);
+        await OnUnlocked.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        LockoutTimer?.Dispose();
+    }
+}
