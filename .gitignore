@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.db
+*.sqlite
+*.log
+*.DS_Store
+AppPackages/
+platforms/**/bin/
+platforms/**/obj/

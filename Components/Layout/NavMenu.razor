@@ -1,0 +1,36 @@
+﻿@inject NavigationManager NavigationManager
+
+<div class="flex flex-col h-full">
+    <!-- Logo -->
+    <div class="h-16 flex items-center @(Collapsed ? "justify-center px-2" : "px-4") border-b border-slate-200 dark:border-slate-700">
+        @if (Collapsed)
+        {
+            <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center transition-transform hover:scale-110">
+                <span class="text-white font-bold text-sm">W</span>
+            </div>
+        }
+        else
+        {
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center transition-transform hover:scale-110">
+                    <span class="text-white font-bold text-sm">W</span>
+                </div>
+                <span class="text-lg font-semibold text-slate-800 dark:text-slate-100 animate-fade-in">Whitespc</span>
+            </div>
+        }
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 py-4 @(Collapsed ? "px-2" : "px-3") space-y-1">
+        <NavItem Href="" Icon="home" Label="Today" Collapsed="@Collapsed" />
+        <NavItem Href="calendar" Icon="calendar" Label="Calendar" Collapsed="@Collapsed" />
+        <NavItem Href="entries" Icon="list" Label="Entries" Collapsed="@Collapsed" />
+        <NavItem Href="analytics" Icon="chart" Label="Analytics" Collapsed="@Collapsed" />
+        <NavItem Href="settings" Icon="settings" Label="Settings" Collapsed="@Collapsed" />
+    </nav>
+</div>
+
+@code {
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public EventCallback OnToggle { get; set; }
+}

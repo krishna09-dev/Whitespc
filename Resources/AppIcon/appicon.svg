@@ -1,0 +1,43 @@
+<svg
+        width="1024"
+        height="1024"
+        viewBox="0 0 1024 1024"
+        xmlns="http://www.w3.org/2000/svg">
+
+    <defs>
+        <linearGradient id="bgGradient" x1="0" y1="0" x2="1024" y2="1024">
+            <stop offset="0%" stop-color="#8B5CF6"/>
+            <stop offset="50%" stop-color="#7C3AED"/>
+            <stop offset="100%" stop-color="#5B21B6"/>
+        </linearGradient>
+    </defs>
+
+    <rect x="0" y="0" width="1024" height="1024" rx="220" fill="url(#bgGradient)"/>
+
+    <!-- Stroke layer -->
+    <text
+            x="600"
+            y="720"
+            text-anchor="middle"
+            font-size="580"
+            font-weight="900"
+            fill="none"
+            stroke="white"
+            stroke-width="16"
+            font-family="SF Pro Display, Inter, Arial, sans-serif">
+        W
+    </text>
+
+    <!-- Fill layer -->
+    <text
+            x="600"
+            y="720"
+            text-anchor="middle"
+            font-size="580"
+            font-weight="900"
+            fill="white"
+            font-family="SF Pro Display, Inter, Arial, sans-serif">
+        W
+    </text>
+
+</svg>

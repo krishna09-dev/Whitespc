@@ -1,0 +1,9 @@
+/* NavMenu styles - Using Tailwind CSS classes in the component */
+/* This file is kept minimal as styling is done via Tailwind */
+{
+{
+        /* Allow sidebar to scroll for tall menus */
+        height: calc(100vh - 3.5rem);
+        overflow-y: auto;
+    }
+}
