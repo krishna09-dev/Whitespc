@@ -1,0 +1,35 @@
+@using whitespc.Models
+
+<div class="flex flex-wrap gap-2">
+    @foreach (MoodCategory category in Enum.GetValues<MoodCategory>())
+    {
+        <div class="flex flex-wrap gap-2">
+            @foreach (MoodType mood in Enum.GetValues<MoodType>().Where(m => m.GetCategory() == category))
+            {
+                var isSelected = mood == SelectedMood;
+                var bgColor = category switch
+                {
+                    MoodCategory.Positive => isSelected ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50",
+                    MoodCategory.Neutral => isSelected ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50",
+                    _ => isSelected ? "bg-rose-500 text-white border-rose-500" : "bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/50"
+                };
+                
+                <button @onclick="() => SelectMood(mood)" 
+                        class="@bgColor px-3 py-1.5 rounded-full border text-sm transition-all hover:scale-105 flex items-center gap-1.5">
+                    <span>@mood.GetEmoji()</span>
+                    <span class="@(isSelected ? "" : "text-slate-700 dark:text-slate-300")">@mood</span>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public MoodType SelectedMood { get; set; }
+    [Parameter] public EventCallback<MoodType> OnMoodSelected { get; set; }
+
+    private async Task SelectMood(MoodType mood)
+    {
+        await OnMoodSelected.InvokeAsync(mood);
+    }
+}
