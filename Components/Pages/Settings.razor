@@ -1,0 +1,790 @@
+﻿@page "/settings"
+@using whitespc.Data
+@using whitespc.Models
+@using Microsoft.EntityFrameworkCore
+@inject SecurityService SecurityService
+@inject ThemeService ThemeService
+@inject JournalService JournalService
+@inject TagService TagService
+@inject IPdfExportService PdfExport
+@inject IFileSaverService FileSaverService
+@inject JournalDbContext DbContext
+@inject IJSRuntime JSRuntime
+
+<div class="space-y-6 max-w-2xl page-enter">
+    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100 animate-fade-in-up">Settings</h2>
+
+    <!-- Appearance -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-1 hover-lift">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Appearance</h3>
+        
+        <div class="space-y-4">
+            <div class="flex items-center justify-between py-3">
+                <div>
+                    <p class="font-medium text-slate-700 dark:text-slate-300">Dark Mode</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Switch between light and dark themes</p>
+                </div>
+                <button @onclick="ToggleTheme" 
+                        class="relative w-14 h-8 rounded-full transition-all btn-press @(ThemeService.IsDarkMode ? "bg-primary-600" : "bg-slate-200 dark:bg-slate-600")">
+                    <div class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-300 @(ThemeService.IsDarkMode ? "translate-x-6" : "")"></div>
+                </button>
+            </div>
+            
+            <div class="flex items-center justify-between py-3 border-t border-slate-100 dark:border-slate-700">
+                <div>
+                    <p class="font-medium text-slate-700 dark:text-slate-300">Daily Motivation</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Show inspiring quotes on lock screen</p>
+                </div>
+                <button @onclick="ToggleMotivation" 
+                        class="relative w-14 h-8 rounded-full transition-all btn-press @(ShowDailyMotivation ? "bg-primary-600" : "bg-slate-200 dark:bg-slate-600")">
+                    <div class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-300 @(ShowDailyMotivation ? "translate-x-6" : "")"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Security</h3>
+        
+        <div class="space-y-4">
+            <!-- PIN Protection -->
+            <div class="flex items-center justify-between py-3">
+                <div>
+                    <p class="font-medium text-slate-700 dark:text-slate-300">PIN Protection</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        @(HasPin ? "Your journal is protected with a PIN" : "Add a PIN to protect your journal")
+                    </p>
+                </div>
+                <button @onclick="TogglePinSection" class="px-4 py-2 @(HasPin ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30" : "bg-primary-600 hover:bg-primary-700 text-white") rounded-lg transition-colors text-sm">
+                    @(HasPin ? "Remove PIN" : "Set PIN")
+                </button>
+            </div>
+            
+            @if (ShowPinSection)
+            {
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-700 animate-slide-up">
+                    @if (!HasPin)
+                    {
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Enter PIN</label>
+                                <input type="password" @bind="NewPin" maxlength="6" inputmode="numeric" placeholder="Enter 4-6 digit PIN"
+                                       class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center tracking-widest" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm PIN</label>
+                                <input type="password" @bind="ConfirmPin" maxlength="6" inputmode="numeric" placeholder="Confirm PIN"
+                                       class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center tracking-widest" />
+                            </div>
+                            @if (!string.IsNullOrEmpty(PinError))
+                            {
+                                <p class="text-sm text-red-500">@PinError</p>
+                            }
+                            <button @onclick="SetPin" class="w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                                Save PIN
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-3">
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Enter your current PIN to remove protection</p>
+                            <input type="password" @bind="CurrentPin" maxlength="6" inputmode="numeric" placeholder="Enter current PIN"
+                                   class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center tracking-widest" />
+                            @if (!string.IsNullOrEmpty(PinError))
+                            {
+                                <p class="text-sm text-red-500">@PinError</p>
+                            }
+                            <button @onclick="RemovePin" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                                Remove PIN
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Auto-Lock Timeout -->
+            @if (HasPin)
+            {
+                <div class="flex items-center justify-between py-3 border-t border-slate-100 dark:border-slate-700">
+                    <div>
+                        <p class="font-medium text-slate-700 dark:text-slate-300">Auto-Lock</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Lock app after period of inactivity</p>
+                    </div>
+                    <select @bind="SelectedLockTimeout" @bind:after="UpdateLockTimeout"
+                            class="px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm">
+                        <option value="0">Always</option>
+                        <option value="1">After 1 minute</option>
+                        <option value="5">After 5 minutes</option>
+                        <option value="15">After 15 minutes</option>
+                        <option value="30">After 30 minutes</option>
+                        <option value="-1">Never</option>
+                    </select>
+                </div>
+
+                <!-- Security Questions -->
+                <div class="flex items-center justify-between py-3 border-t border-slate-100 dark:border-slate-700">
+                    <div>
+                        <p class="font-medium text-slate-700 dark:text-slate-300">Recovery Questions</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            @(HasSecurityQuestions ? "Recovery questions are set" : "Set up questions to recover your PIN")
+                        </p>
+                    </div>
+                    <button @onclick="() => ShowSecurityQuestionsSection = !ShowSecurityQuestionsSection" 
+                            class="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-sm">
+                        @(HasSecurityQuestions ? "Update" : "Set Up")
+                    </button>
+                </div>
+
+                @if (ShowSecurityQuestionsSection)
+                {
+                    <div class="pt-4 border-t border-slate-200 dark:border-slate-700 animate-slide-up space-y-4">
+                        @if (!string.IsNullOrEmpty(SecurityQuestionsError))
+                        {
+                            <p class="text-sm text-red-500">@SecurityQuestionsError</p>
+                        }
+                        
+                        <div>
+                            <select @bind="Question1" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2">
+                                <option value="">Select question 1...</option>
+                                @foreach (var q in AvailableQuestions.Where(q => q != Question2 && q != Question3))
+                                {
+                                    <option value="@q">@q</option>
+                                }
+                            </select>
+                            <input type="text" @bind="Answer1" placeholder="Your answer"
+                                   class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        </div>
+                        
+                        <div>
+                            <select @bind="Question2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2">
+                                <option value="">Select question 2...</option>
+                                @foreach (var q in AvailableQuestions.Where(q => q != Question1 && q != Question3))
+                                {
+                                    <option value="@q">@q</option>
+                                }
+                            </select>
+                            <input type="text" @bind="Answer2" placeholder="Your answer"
+                                   class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        </div>
+                        
+                        <div>
+                            <select @bind="Question3" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2">
+                                <option value="">Select question 3...</option>
+                                @foreach (var q in AvailableQuestions.Where(q => q != Question1 && q != Question2))
+                                {
+                                    <option value="@q">@q</option>
+                                }
+                            </select>
+                            <input type="text" @bind="Answer3" placeholder="Your answer"
+                                   class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        </div>
+                        
+                        <button @onclick="SaveSecurityQuestions" class="w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                            Save Recovery Questions
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Export -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Export</h3>
+        
+        <div class="space-y-4">
+            <p class="text-sm text-slate-600 dark:text-slate-400">Export your journal entries as a PDF file</p>
+            
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">From</label>
+                    <input type="date" @bind="ExportStartDate" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm date-input" />
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To</label>
+                    <input type="date" @bind="ExportEndDate" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm date-input" />
+                </div>
+            </div>
+            
+            <button @onclick="ExportToPdf" disabled="@IsExporting" 
+                    class="w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
+                @if (IsExporting)
+                {
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Exporting...</span>
+                }
+                else
+                {
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span>Export to PDF</span>
+                }
+            </button>
+            
+            @if (!string.IsNullOrEmpty(ExportMessage))
+            {
+                <p class="text-sm @(ExportSuccess ? "text-green-600" : "text-red-500")">@ExportMessage</p>
+            }
+        </div>
+    </div>
+
+    <!-- About -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">About</h3>
+        
+        <div class="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+            <div class="flex justify-between">
+                <span>App Name</span>
+                <span class="text-slate-800 dark:text-slate-200 font-medium">Whitespc</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Version</span>
+                <span class="text-slate-800 dark:text-slate-200 font-medium">1.0.0</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Framework</span>
+                <span class="text-slate-800 dark:text-slate-200 font-medium">.NET MAUI Blazor Hybrid</span>
+            </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <p class="text-xs text-slate-400 text-center">
+                Made with ❤️ for Personal Journaling. 
+            </p>
+        </div>
+    </div>
+
+    <!-- Demo Data Generator -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-purple-200 dark:border-purple-800 p-6">
+        <h3 class="text-lg font-semibold text-purple-600 dark:text-purple-400 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+            </svg>
+            Demo Data Generator
+        </h3>
+        
+        <div class="space-y-4">
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+                Generate sample journal entries for testing and demonstration purposes. This will create realistic entries spanning multiple days with various moods, tags, and content.
+            </p>
+            
+            <div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                @if (!IsGeneratingDemo)
+                {
+                    <button @onclick="GenerateDemoData" 
+                            class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Generate Demo Entries
+                    </button>
+                }
+                else
+                {
+                    <div class="flex items-center justify-center gap-3 py-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                        <span class="text-purple-700 dark:text-purple-300">Generating entries...</span>
+                    </div>
+                }
+                
+                @if (!string.IsNullOrEmpty(DemoMessage))
+                {
+                    <p class="mt-3 text-sm @(DemoSuccess ? "text-green-600" : "text-red-600")">@DemoMessage</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone - Database Management -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-red-200 dark:border-red-800 p-6">
+        <h3 class="text-lg font-semibold text-red-600 dark:text-red-400 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Danger Zone
+        </h3>
+        
+        <div class="space-y-4">
+            <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">Database Location:</p>
+                <code class="block p-2 bg-slate-100 dark:bg-slate-900 rounded text-xs break-all text-slate-600 dark:text-slate-400">@DbPath</code>
+            </div>
+            
+            <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p class="text-sm text-red-700 dark:text-red-300 mb-3">
+                    <strong>Warning:</strong> This will permanently delete all your journal entries, settings, and PIN. This action cannot be undone!
+                </p>
+                
+                @if (!ShowDeleteConfirmation)
+                {
+                    <button @onclick="() => ShowDeleteConfirmation = true" 
+                            class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Wipe All Data
+                    </button>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        <p class="text-sm text-red-700 dark:text-red-300 font-medium">
+                            Type "DELETE" to confirm:
+                        </p>
+                        <input type="text" @bind="DeleteConfirmText" placeholder="Type DELETE"
+                               class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-red-300 dark:border-red-700 rounded-lg text-center uppercase tracking-widest" />
+                        <div class="flex gap-2">
+                            <button @onclick="CancelDelete" 
+                                    class="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                            <button @onclick="WipeDatabase" disabled="@(DeleteConfirmText != "DELETE")"
+                                    class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900 text-white rounded-lg transition-colors">
+                                Confirm Delete
+                            </button>
+                        </div>
+                    </div>
+                }
+                
+                @if (!string.IsNullOrEmpty(DbMessage))
+                {
+                    <p class="mt-3 text-sm @(DbMessageSuccess ? "text-green-600" : "text-red-600")">@DbMessage</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool HasPin { get; set; }
+    private bool ShowPinSection { get; set; }
+    private string NewPin { get; set; } = "";
+    private string ConfirmPin { get; set; } = "";
+    private string CurrentPin { get; set; } = "";
+    private string PinError { get; set; } = "";
+    
+    // Lock Timeout
+    private int SelectedLockTimeout { get; set; } = 5;
+    
+    // Security Questions
+    private bool HasSecurityQuestions { get; set; }
+    private bool ShowSecurityQuestionsSection { get; set; }
+    private string Question1 { get; set; } = "";
+    private string Question2 { get; set; } = "";
+    private string Question3 { get; set; } = "";
+    private string Answer1 { get; set; } = "";
+    private string Answer2 { get; set; } = "";
+    private string Answer3 { get; set; } = "";
+    private string SecurityQuestionsError { get; set; } = "";
+    
+    // Database Management
+    private string DbPath { get; set; } = "";
+    private bool ShowDeleteConfirmation { get; set; }
+    private string DeleteConfirmText { get; set; } = "";
+    private string DbMessage { get; set; } = "";
+    private bool DbMessageSuccess { get; set; }
+    
+    private static readonly List<string> AvailableQuestions = new()
+    {
+        "What was the name of your first pet?",
+        "What city were you born in?",
+        "What was your childhood nickname?",
+        "What is your mother's maiden name?",
+        "What was the name of your first school?",
+        "What is your favorite book?",
+        "What was your first car?",
+        "What is your favorite movie?",
+        "What street did you grow up on?",
+        "What is your favorite food?"
+    };
+    
+    // Daily Motivation
+    private bool ShowDailyMotivation { get; set; } = true;
+    
+    // Export
+    private DateTime? ExportStartDate { get; set; }
+    private DateTime? ExportEndDate { get; set; }
+    private bool IsExporting { get; set; }
+    
+    // Demo Data Generator
+    private bool IsGeneratingDemo { get; set; }
+    private string DemoMessage { get; set; } = "";
+    private bool DemoSuccess { get; set; }
+    private string ExportMessage { get; set; } = "";
+    private bool ExportSuccess { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        HasPin = await SecurityService.HasPinSetAsync();
+        HasSecurityQuestions = await SecurityService.HasSecurityQuestionsAsync();
+        
+        var settings = await SecurityService.GetSettingsAsync();
+        SelectedLockTimeout = (int)settings.LockTimeout;
+        ShowDailyMotivation = settings.ShowDailyMotivation;
+        
+        ExportStartDate = DateTime.Today.AddMonths(-1);
+        ExportEndDate = DateTime.Today;
+        
+        // Set database path
+        DbPath = Path.Combine(FileSystem.AppDataDirectory, "whitespc.db");
+    }
+
+    private async Task WipeDatabase()
+    {
+        DbMessage = "";
+        
+        if (DeleteConfirmText != "DELETE")
+        {
+            DbMessage = "Please type DELETE to confirm.";
+            DbMessageSuccess = false;
+            return;
+        }
+        
+        try
+        {
+            var dbPath = Path.Combine(FileSystem.AppDataDirectory, "whitespc.db");
+            
+            if (File.Exists(dbPath))
+            {
+                // Close the database connection first
+                var connection = DbContext.Database.GetDbConnection();
+                if (connection.State != System.Data.ConnectionState.Closed)
+                {
+                    await connection.CloseAsync();
+                }
+                await DbContext.DisposeAsync();
+                
+                // Clear SQLite connection pool to release all connections
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                
+                // Small delay to ensure connections are fully released
+                await Task.Delay(100);
+                
+                // Now delete the database file
+                File.Delete(dbPath);
+                
+                // Also delete journal files if they exist
+                var walPath = dbPath + "-wal";
+                var shmPath = dbPath + "-shm";
+                if (File.Exists(walPath)) File.Delete(walPath);
+                if (File.Exists(shmPath)) File.Delete(shmPath);
+                
+                DbMessage = "Database deleted successfully! The app will restart...";
+                DbMessageSuccess = true;
+                
+                // Give user time to see the message, then close the app
+                await Task.Delay(1500);
+                
+                // Close the application - user needs to restart
+                Application.Current?.Quit();
+            }
+            else
+            {
+                DbMessage = "Database file not found.";
+                DbMessageSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            DbMessage = $"Error deleting database: {ex.Message}";
+            DbMessageSuccess = false;
+        }
+        
+        ShowDeleteConfirmation = false;
+        DeleteConfirmText = "";
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirmation = false;
+        DeleteConfirmText = "";
+    }
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleThemeAsync();
+        await SecurityService.SetDarkModeAsync(ThemeService.IsDarkMode);
+    }
+
+    private async Task ToggleMotivation()
+    {
+        ShowDailyMotivation = !ShowDailyMotivation;
+        await SecurityService.SetShowDailyMotivationAsync(ShowDailyMotivation);
+    }
+
+    private void TogglePinSection()
+    {
+        ShowPinSection = !ShowPinSection;
+        PinError = "";
+        NewPin = "";
+        ConfirmPin = "";
+        CurrentPin = "";
+    }
+
+    private async Task SetPin()
+    {
+        PinError = "";
+        
+        if (string.IsNullOrWhiteSpace(NewPin) || NewPin.Length < 4)
+        {
+            PinError = "PIN must be at least 4 digits";
+            return;
+        }
+        
+        if (NewPin != ConfirmPin)
+        {
+            PinError = "PINs do not match";
+            return;
+        }
+
+        await SecurityService.SetPinAsync(NewPin);
+        HasPin = true;
+        ShowPinSection = false;
+        NewPin = "";
+        ConfirmPin = "";
+    }
+
+    private async Task RemovePin()
+    {
+        PinError = "";
+        
+        var (success, _, _) = await SecurityService.ValidatePinAsync(CurrentPin);
+        if (!success)
+        {
+            PinError = "Incorrect PIN";
+            return;
+        }
+
+        await SecurityService.RemovePinAsync();
+        HasPin = false;
+        HasSecurityQuestions = false;
+        ShowPinSection = false;
+        ShowSecurityQuestionsSection = false;
+        CurrentPin = "";
+    }
+
+    private async Task UpdateLockTimeout()
+    {
+        await SecurityService.SetLockTimeoutAsync((LockTimeout)SelectedLockTimeout);
+    }
+
+    private async Task SaveSecurityQuestions()
+    {
+        SecurityQuestionsError = "";
+        
+        if (string.IsNullOrWhiteSpace(Question1) || string.IsNullOrWhiteSpace(Answer1) ||
+            string.IsNullOrWhiteSpace(Question2) || string.IsNullOrWhiteSpace(Answer2) ||
+            string.IsNullOrWhiteSpace(Question3) || string.IsNullOrWhiteSpace(Answer3))
+        {
+            SecurityQuestionsError = "Please complete all questions and answers";
+            return;
+        }
+
+        await SecurityService.SetSecurityQuestionsAsync(
+            Question1, Answer1,
+            Question2, Answer2,
+            Question3, Answer3);
+        
+        HasSecurityQuestions = true;
+        ShowSecurityQuestionsSection = false;
+        Answer1 = "";
+        Answer2 = "";
+        Answer3 = "";
+    }
+
+    private async Task ExportToPdf()
+    {
+        IsExporting = true;
+        ExportMessage = "";
+        
+        try
+        {
+            var startDate = ExportStartDate.HasValue ? DateOnly.FromDateTime(ExportStartDate.Value) : (DateOnly?)null;
+            var endDate = ExportEndDate.HasValue ? DateOnly.FromDateTime(ExportEndDate.Value) : (DateOnly?)null;
+            
+            var entries = await JournalService.GetEntriesAsync(startDate: startDate, endDate: endDate, pageSize: 1000);
+            
+            if (!entries.Any())
+            {
+                ExportMessage = "No entries found for the selected date range";
+                ExportSuccess = false;
+                return;
+            }
+
+            var dateRange = $"{startDate?.ToString("MMM d, yyyy") ?? "Beginning"} - {endDate?.ToString("MMM d, yyyy") ?? "Today"}";
+            var pdfBytes = PdfExport.ExportToPdf(entries, $"Journal Export ({dateRange})");
+            
+            // Create file name
+            var fileName = $"whitespc_journal_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            
+            // Use FileSaver to open native save dialog
+            var result = await FileSaverService.SaveFileAsync(fileName, pdfBytes, "application/pdf");
+            
+            if (result.IsSuccessful)
+            {
+                ExportMessage = $"Exported {entries.Count} entries successfully!";
+                ExportSuccess = true;
+            }
+            else
+            {
+                ExportMessage = result.ErrorMessage ?? "Export cancelled";
+                ExportSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ExportMessage = $"Export failed: {ex.Message}";
+            ExportSuccess = false;
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+
+    private async Task GenerateDemoData()
+    {
+        IsGeneratingDemo = true;
+        DemoMessage = "";
+        
+        try
+        {
+            var random = new Random();
+            var allTags = await TagService.GetAllTagsAsync();
+            var allMoods = Enum.GetValues<MoodType>().ToList();
+            
+            // Sample titles for different moods/situations
+            var titles = new List<string>
+            {
+                "Morning Reflections", "A Day to Remember", "Thoughts Before Sleep",
+                "Grateful for Today", "New Beginnings", "Weekend Vibes",
+                "Productivity Wins", "Self-Care Sunday", "Midweek Check-in",
+                "Friday Feelings", "Peaceful Evening", "Challenging Day",
+                "Small Victories", "Learning Something New", "Quality Time",
+                "Nature Walk Thoughts", "Creative Burst", "Mindful Moments",
+                "End of Day Recap", "Fresh Start", "Unexpected Joy",
+                "Rainy Day Musings", "Sunny Disposition", "Late Night Thoughts"
+            };
+            
+            // Sample content paragraphs
+            var contentParagraphs = new List<string>
+            {
+                "Today was one of those days where everything seemed to fall into place. I woke up feeling refreshed and ready to take on whatever came my way. The morning coffee tasted extra good, and I found myself smiling at small things.",
+                "I've been thinking a lot about my goals lately. It's easy to get caught up in the day-to-day routine and forget to look at the bigger picture. Taking time to journal helps me stay connected to what really matters.",
+                "Had a wonderful conversation with an old friend today. It reminded me how important it is to maintain connections with the people who understand us. Sometimes a simple chat can lift your entire mood.",
+                "Work was challenging today, but I managed to push through. There were moments when I felt overwhelmed, but I took breaks when needed and focused on one task at a time. Progress, not perfection.",
+                "Spent some time in nature this afternoon. There's something healing about being surrounded by trees and fresh air. It helps put everything into perspective and reminds me to slow down.",
+                "Today I learned something new that excited me. It's amazing how learning can reignite curiosity and make you feel alive. I want to explore this topic more in the coming days.",
+                "Feeling grateful for the small things today - a warm meal, a comfortable bed, the sound of rain outside. Sometimes happiness is found in the simplest moments.",
+                "Struggled with motivation today. Not every day can be perfect, and that's okay. I'm learning to be gentle with myself on difficult days and trust that tomorrow will be better.",
+                "Made time for self-care today. It's not selfish to prioritize your own well-being. In fact, it makes me better equipped to show up for others when I take care of myself first.",
+                "Had a creative breakthrough today! Sometimes ideas come when you least expect them. I've learned to always keep a notebook handy to capture these moments of inspiration.",
+                "Reflecting on how far I've come this year. Growth isn't always linear, but looking back, I can see real progress. Every small step counts.",
+                "Today was about rest and recovery. Sometimes the most productive thing you can do is nothing at all. Recharging is essential for long-term success.",
+                "Tried something outside my comfort zone today. It was scary at first, but the feeling of accomplishment afterward was worth it. Growth happens at the edge of comfort.",
+                "Spent quality time with family today. These moments are precious and remind me of what truly matters in life. Making memories is more valuable than any material possession.",
+                "Practiced mindfulness meditation for 20 minutes today. My mind wandered a lot, but I kept bringing it back. The practice itself is the goal, not perfection."
+            };
+            
+            // Generate entries for the past 14 days, skipping some days randomly
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var entriesCreated = 0;
+            
+            for (int daysAgo = 0; daysAgo < 14; daysAgo++)
+            {
+                // Skip some days randomly (about 20% chance)
+                if (daysAgo > 0 && random.Next(100) < 20)
+                    continue;
+                
+                var entryDate = today.AddDays(-daysAgo);
+                
+                // Determine how many entries for this day (1-3, weighted towards 1)
+                var entriesForDay = random.Next(100) < 70 ? 1 : (random.Next(100) < 70 ? 2 : 3);
+                
+                for (int e = 0; e < entriesForDay; e++)
+                {
+                    // Pick random primary mood
+                    var primaryMood = allMoods[random.Next(allMoods.Count)];
+                    
+                    // Maybe add secondary moods (50% chance for first, 30% for second)
+                    MoodType? secondaryMood1 = null;
+                    MoodType? secondaryMood2 = null;
+                    
+                    if (random.Next(100) < 50)
+                    {
+                        do { secondaryMood1 = allMoods[random.Next(allMoods.Count)]; }
+                        while (secondaryMood1 == primaryMood);
+                        
+                        if (random.Next(100) < 30)
+                        {
+                            do { secondaryMood2 = allMoods[random.Next(allMoods.Count)]; }
+                            while (secondaryMood2 == primaryMood || secondaryMood2 == secondaryMood1);
+                        }
+                    }
+                    
+                    // Pick random title
+                    var title = titles[random.Next(titles.Count)];
+                    
+                    // Build content (2-4 paragraphs)
+                    var numParagraphs = random.Next(2, 5);
+                    var usedParagraphs = new HashSet<int>();
+                    var contentBuilder = new System.Text.StringBuilder();
+                    
+                    for (int p = 0; p < numParagraphs; p++)
+                    {
+                        int paragraphIndex;
+                        do { paragraphIndex = random.Next(contentParagraphs.Count); }
+                        while (usedParagraphs.Contains(paragraphIndex) && usedParagraphs.Count < contentParagraphs.Count);
+                        
+                        usedParagraphs.Add(paragraphIndex);
+                        contentBuilder.AppendLine($"<p>{contentParagraphs[paragraphIndex]}</p>");
+                    }
+                    
+                    // Pick random tags (1-4 tags)
+                    var numTags = random.Next(1, 5);
+                    var selectedTags = allTags.OrderBy(_ => random.Next()).Take(numTags).ToList();
+                    
+                    // Create the entry
+                    var entry = new JournalEntry
+                    {
+                        Title = title,
+                        Content = contentBuilder.ToString(),
+                        EntryDate = entryDate,
+                        PrimaryMood = primaryMood,
+                        SecondaryMood1 = secondaryMood1,
+                        SecondaryMood2 = secondaryMood2,
+                        IsFavorite = random.Next(100) < 15, // 15% chance of being favorite
+                        IsPinned = random.Next(100) < 10,   // 10% chance of being pinned
+                        IsArchived = false,
+                        Tags = selectedTags
+                    };
+                    
+                    // Set created time to a random time during that day
+                    var hour = e == 0 ? random.Next(7, 12) : (e == 1 ? random.Next(14, 18) : random.Next(19, 23));
+                    var minute = random.Next(0, 60);
+                    entry.CreatedAt = entryDate.ToDateTime(new TimeOnly(hour, minute));
+                    entry.UpdatedAt = entry.CreatedAt;
+                    
+                    await JournalService.CreateEntryAsync(entry);
+                    entriesCreated++;
+                }
+            }
+            
+            DemoMessage = $"Successfully created {entriesCreated} demo journal entries!";
+            DemoSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            DemoMessage = $"Error generating demo data: {ex.Message}";
+            DemoSuccess = false;
+        }
+        finally
+        {
+            IsGeneratingDemo = false;
+        }
+    }
+}
+
