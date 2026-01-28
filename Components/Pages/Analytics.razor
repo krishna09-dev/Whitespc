@@ -1,0 +1,294 @@
+﻿@page "/analytics"
+@inject AnalyticsService AnalyticsService
+@inject JournalService JournalService
+
+<div class="space-y-6 page-enter">
+    <!-- Header -->
+    <div class="flex items-center justify-between animate-fade-in-up">
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Analytics</h2>
+        
+        <!-- Date Range Filter -->
+        <div class="flex items-center gap-3">
+            <select @bind="SelectedRange" @bind:after="LoadAnalyticsAsync" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm transition-all focus:ring-2 focus:ring-primary-500">
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last year</option>
+                <option value="0">All time</option>
+            </select>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Streak Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="animate-fade-in-up stagger-1"><StatCard Title="Current Streak" Value="@StreakInfo.CurrentStreak.ToString()" Icon="🔥" Color="orange" Subtitle="days" /></div>
+            <div class="animate-fade-in-up stagger-2"><StatCard Title="Longest Streak" Value="@StreakInfo.LongestStreak.ToString()" Icon="🏆" Color="purple" Subtitle="days" /></div>
+            <div class="animate-fade-in-up stagger-3"><StatCard Title="Total Entries" Value="@StreakInfo.TotalEntries.ToString()" Icon="📓" Color="blue" Subtitle="entries" /></div>
+            <div class="animate-fade-in-up stagger-4"><StatCard Title="Avg. Word Count" Value="@AverageWordCount.ToString("N0")" Icon="✍️" Color="green" Subtitle="words/entry" /></div>
+        </div>
+
+        <!-- Mood Distribution -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-3 hover-lift">
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Mood Distribution</h3>
+            
+            @if (MoodDistribution.TotalCount > 0)
+            {
+                <div class="space-y-4">
+                    <!-- Bar visualization -->
+                    <div class="h-8 rounded-full overflow-hidden flex">
+                        <div class="bg-emerald-500 transition-all duration-500" style="width: @(MoodDistribution.PositivePercentage)%"></div>
+                        <div class="bg-amber-500 transition-all duration-500" style="width: @(MoodDistribution.NeutralPercentage)%"></div>
+                        <div class="bg-rose-500 transition-all duration-500" style="width: @(MoodDistribution.NegativePercentage)%"></div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="flex items-center justify-center gap-2 mb-1">
+                                <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Positive</span>
+                            </div>
+                            <p class="text-2xl font-bold text-slate-800 dark:text-slate-100">@MoodDistribution.PositivePercentage.ToString("N1")%</p>
+                            <p class="text-xs text-slate-500">@MoodDistribution.PositiveCount entries</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-center gap-2 mb-1">
+                                <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Neutral</span>
+                            </div>
+                            <p class="text-2xl font-bold text-slate-800 dark:text-slate-100">@MoodDistribution.NeutralPercentage.ToString("N1")%</p>
+                            <p class="text-xs text-slate-500">@MoodDistribution.NeutralCount entries</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-center gap-2 mb-1">
+                                <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Negative</span>
+                            </div>
+                            <p class="text-2xl font-bold text-slate-800 dark:text-slate-100">@MoodDistribution.NegativePercentage.ToString("N1")%</p>
+                            <p class="text-xs text-slate-500">@MoodDistribution.NegativeCount entries</p>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="text-center text-slate-500 dark:text-slate-400 py-8">No mood data available for this period</p>
+            }
+        </div>
+
+        <!-- Most Frequent Mood & Tags -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Most Frequent Mood -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-4 hover-lift">
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Most Frequent Mood</h3>
+                
+                @if (MostFrequentMood.HasValue)
+                {
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-2xl flex items-center justify-center mood-@MostFrequentMood.Value.GetCategory().ToString().ToLower() animate-bounce-subtle">
+                            <span class="text-4xl">@MostFrequentMood.Value.GetEmoji()</span>
+                        </div>
+                        <div>
+                            <p class="text-xl font-bold text-slate-800 dark:text-slate-100">@MostFrequentMood.Value</p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">@MostFrequentMood.Value.GetCategory()</p>
+                        </div>
+                    </div>
+                    
+                    @if (MoodDistribution.MoodCounts != null)
+                    {
+                        <div class="mt-6 space-y-2">
+                            @foreach (var mood in MoodDistribution.MoodCounts.OrderByDescending(m => m.Value).Take(5))
+                            {
+                                var percentage = MoodDistribution.TotalCount > 0 ? (double)mood.Value / MoodDistribution.TotalCount * 100 : 0;
+                                <div class="flex items-center gap-3">
+                                    <span class="w-8 text-center">@mood.Key.GetEmoji()</span>
+                                    <div class="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                        <div class="h-full bg-primary-500 transition-all duration-500" style="width: @percentage%"></div>
+                                    </div>
+                                    <span class="text-sm text-slate-500 dark:text-slate-400 w-12 text-right">@mood.Value</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-center text-slate-500 dark:text-slate-400 py-8">No mood data available</p>
+                }
+            </div>
+
+            <!-- Most Used Tags -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-4 hover-lift">
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Most Used Tags</h3>
+                
+                @if (TagUsage.Any())
+                {
+                    <div class="space-y-3">
+                        @{ var tagIndex = 0; }
+                        @foreach (var tag in TagUsage.Take(8))
+                        {
+                            tagIndex++;
+                            var maxCount = TagUsage.Values.Max();
+                            var percentage = maxCount > 0 ? (double)tag.Value / maxCount * 100 : 0;
+                            <div class="flex items-center gap-3 animate-fade-in-up" style="animation-delay: @(tagIndex * 0.05)s;">
+                                <span class="text-sm text-slate-700 dark:text-slate-300 w-24 truncate font-medium">@tag.Key</span>
+                                <div class="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                    <div class="h-full bg-primary-500 rounded-full transition-all duration-700 progress-bar" style="width: @percentage%;"></div>
+                                </div>
+                                <span class="text-sm text-slate-500 dark:text-slate-400 w-8 text-right">@tag.Value</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                        <p class="text-slate-500 dark:text-slate-400">No tag data available</p>
+                        <p class="text-sm text-slate-400 dark:text-slate-500 mt-1">Add tags to your journal entries to see them here</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+
+
+        <!-- Word Count Trend (Last 7 Days) -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-5 hover-lift">
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">7-Day Word Count Trend</h3>
+            
+            @if (WordCountTrends.Any())
+            {
+                <div class="h-48 flex items-end gap-2">
+                    @{
+                        var maxWords = WordCountTrends.Any() ? Math.Max(WordCountTrends.Max(w => w.WordCount), 1) : 1;
+                    }
+                    @foreach (var trend in WordCountTrends)
+                    {
+                        var height = maxWords > 0 ? (double)trend.WordCount / maxWords * 100 : 0;
+                        var hasData = trend.WordCount > 0;
+                        <div class="flex-1 flex flex-col items-center group relative">
+                            <div class="w-full flex items-end justify-center" style="height: 180px;">
+                                <div class="w-full max-w-[40px] @(hasData ? "bg-primary-500 hover:bg-primary-600" : "bg-slate-200 dark:bg-slate-700") rounded-t transition-all duration-500" 
+                                     style="height: @(hasData ? height : 5)%; min-height: 4px;"></div>
+                            </div>
+                            <span class="text-xs text-slate-500 dark:text-slate-400 mt-2">@trend.Date.ToString("ddd")</span>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 dark:bg-slate-600 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                @trend.Date.ToString("MMM d"): @trend.WordCount words
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                    Total: @WordCountTrends.Sum(w => w.WordCount) words this week
+                </div>
+            }
+            else
+            {
+                <p class="text-center text-slate-500 dark:text-slate-400 py-8">No word count data available</p>
+            }
+        </div>
+
+        <!-- 30-Day Activity Grid -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 animate-fade-in-up stagger-6 hover-lift">
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">
+                30-Day Activity
+                <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2">
+                    (@EntryDatesInPeriod.Count written, @MissedDays.Count missed)
+                </span>
+            </h3>
+            
+            <div class="grid grid-cols-10 gap-1.5">
+                @{
+                    var startDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-29));
+                    for (int i = 0; i < 30; i++)
+                    {
+                        var date = startDate.AddDays(i);
+                        var hasEntry = EntryDatesInPeriod.Contains(date);
+                        var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                        
+                        <div class="aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-colors @(hasEntry ? "bg-emerald-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400") @(isToday ? "ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-slate-800" : "")"
+                             title="@date.ToString("MMM d") - @(hasEntry ? "Entry written ✓" : "No entry")">
+                            @date.Day
+                        </div>
+                    }
+                }
+            </div>
+            
+            <div class="flex items-center justify-center gap-6 mt-4 text-xs text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-emerald-500"></div>
+                    <span>Entry written</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded bg-slate-100 dark:bg-slate-700"></div>
+                    <span>No entry</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private int SelectedRange { get; set; } = 30;
+    
+    private StreakInfo StreakInfo { get; set; } = new();
+    private MoodDistribution MoodDistribution { get; set; } = new();
+    private MoodType? MostFrequentMood { get; set; }
+    private Dictionary<string, int> TagUsage { get; set; } = new();
+    private List<WordCountTrend> WordCountTrends { get; set; } = new();
+    private List<DateOnly> MissedDays { get; set; } = new();
+    private List<DateOnly> EntryDatesInPeriod { get; set; } = new();
+    private double AverageWordCount { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAnalyticsAsync();
+    }
+
+    private async Task LoadAnalyticsAsync()
+    {
+        IsLoading = true;
+        
+        DateOnly? startDate = null;
+        DateOnly? endDate = DateOnly.FromDateTime(DateTime.Today);
+        
+        if (SelectedRange > 0)
+        {
+            startDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-SelectedRange));
+        }
+
+        StreakInfo = await AnalyticsService.GetStreakInfoAsync();
+        MoodDistribution = await AnalyticsService.GetMoodDistributionAsync(startDate, endDate);
+        MostFrequentMood = await AnalyticsService.GetMostFrequentMoodAsync(startDate, endDate);
+        TagUsage = await AnalyticsService.GetTagUsageAsync(startDate, endDate);
+        WordCountTrends = await AnalyticsService.GetWordCountTrendsAsync(startDate, endDate);
+        AverageWordCount = await AnalyticsService.GetAverageWordCountAsync(startDate, endDate);
+        
+        if (startDate.HasValue)
+        {
+            MissedDays = await AnalyticsService.GetMissedDaysAsync(startDate.Value, endDate.Value);
+            EntryDatesInPeriod = await AnalyticsService.GetEntryDatesAsync(startDate.Value, endDate.Value);
+        }
+        else
+        {
+            // For "All time", just show last 30 days activity
+            var last30Start = DateOnly.FromDateTime(DateTime.Today.AddDays(-29));
+            MissedDays = await AnalyticsService.GetMissedDaysAsync(last30Start, endDate.Value);
+            EntryDatesInPeriod = await AnalyticsService.GetEntryDatesAsync(last30Start, endDate.Value);
+        }
+
+        IsLoading = false;
+    }
+}
