@@ -4,5 +4,5 @@ namespace whitespc.Services;
 
 public interface IPdfExportService
 {
-    byte[] ExportToPdf(IReadOnlyList<JournalEntry> entries, string title);
+    Task<byte[]> ExportToPdfAsync(IReadOnlyList<JournalEntry> entries, string title);
 }

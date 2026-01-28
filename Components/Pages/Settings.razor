@@ -599,14 +599,22 @@
     {
         IsExporting = true;
         ExportMessage = "";
-        
+
         try
         {
-            var startDate = ExportStartDate.HasValue ? DateOnly.FromDateTime(ExportStartDate.Value) : (DateOnly?)null;
-            var endDate = ExportEndDate.HasValue ? DateOnly.FromDateTime(ExportEndDate.Value) : (DateOnly?)null;
-            
-            var entries = await JournalService.GetEntriesAsync(startDate: startDate, endDate: endDate, pageSize: 1000);
-            
+            var startDate = ExportStartDate.HasValue
+                ? DateOnly.FromDateTime(ExportStartDate.Value)
+                : (DateOnly?)null;
+
+            var endDate = ExportEndDate.HasValue
+                ? DateOnly.FromDateTime(ExportEndDate.Value)
+                : (DateOnly?)null;
+
+            var entries = await JournalService.GetEntriesAsync(
+                startDate: startDate,
+                endDate: endDate,
+                pageSize: 1000);
+
             if (!entries.Any())
             {
                 ExportMessage = "No entries found for the selected date range";
@@ -614,15 +622,19 @@
                 return;
             }
 
-            var dateRange = $"{startDate?.ToString("MMM d, yyyy") ?? "Beginning"} - {endDate?.ToString("MMM d, yyyy") ?? "Today"}";
-            var pdfBytes = PdfExport.ExportToPdf(entries, $"Journal Export ({dateRange})");
-            
-            // Create file name
+            var dateRange =
+                $"{(startDate?.ToString("MMM d, yyyy") ?? "Beginning")} - {(endDate?.ToString("MMM d, yyyy") ?? "Today")}";
+            var title = $"Journal Export ({dateRange})";
+
+            // ✅ Service handles UIKit drawing on UI thread internally
+            var pdfBytes = await PdfExport.ExportToPdfAsync(entries, title);
+
             var fileName = $"whitespc_journal_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-            
-            // Use FileSaver to open native save dialog
-            var result = await FileSaverService.SaveFileAsync(fileName, pdfBytes, "application/pdf");
-            
+
+            // ✅ Present save UI ONLY on main thread
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await FileSaverService.SaveFileAsync(fileName, pdfBytes, "application/pdf"));
+
             if (result.IsSuccessful)
             {
                 ExportMessage = $"Exported {entries.Count} entries successfully!";
@@ -644,19 +656,18 @@
             IsExporting = false;
         }
     }
-
-    private async Task GenerateDemoData()
+    
+        private async Task GenerateDemoData()
     {
         IsGeneratingDemo = true;
         DemoMessage = "";
-        
+
         try
         {
             var random = new Random();
             var allTags = await TagService.GetAllTagsAsync();
             var allMoods = Enum.GetValues<MoodType>().ToList();
-            
-            // Sample titles for different moods/situations
+
             var titles = new List<string>
             {
                 "Morning Reflections", "A Day to Remember", "Thoughts Before Sleep",
@@ -668,8 +679,7 @@
                 "End of Day Recap", "Fresh Start", "Unexpected Joy",
                 "Rainy Day Musings", "Sunny Disposition", "Late Night Thoughts"
             };
-            
-            // Sample content paragraphs
+
             var contentParagraphs = new List<string>
             {
                 "Today was one of those days where everything seemed to fall into place. I woke up feeling refreshed and ready to take on whatever came my way. The morning coffee tasted extra good, and I found myself smiling at small things.",
@@ -688,91 +698,90 @@
                 "Spent quality time with family today. These moments are precious and remind me of what truly matters in life. Making memories is more valuable than any material possession.",
                 "Practiced mindfulness meditation for 20 minutes today. My mind wandered a lot, but I kept bringing it back. The practice itself is the goal, not perfection."
             };
-            
-            // Generate entries for the past 14 days, skipping some days randomly
+
             var today = DateOnly.FromDateTime(DateTime.Today);
             var entriesCreated = 0;
-            
-            for (int daysAgo = 0; daysAgo < 14; daysAgo++)
+            var daysChecked = 0;
+
+            // create up to 14 demo entries on UNIQUE dates
+            while (entriesCreated < 14 && daysChecked < 60)
             {
-                // Skip some days randomly (about 20% chance)
-                if (daysAgo > 0 && random.Next(100) < 20)
+                var entryDate = today.AddDays(-daysChecked);
+                daysChecked++;
+
+                // optional: randomly skip some days
+                if (daysChecked > 1 && random.Next(100) < 20)
                     continue;
-                
-                var entryDate = today.AddDays(-daysAgo);
-                
-                // Determine how many entries for this day (1-3, weighted towards 1)
-                var entriesForDay = random.Next(100) < 70 ? 1 : (random.Next(100) < 70 ? 2 : 3);
-                
-                for (int e = 0; e < entriesForDay; e++)
+
+                // IMPORTANT: respect "1 entry per day"
+                if (await JournalService.HasEntryForDateAsync(entryDate))
+                    continue;
+
+                var primaryMood = allMoods[random.Next(allMoods.Count)];
+
+                MoodType? secondaryMood1 = null;
+                MoodType? secondaryMood2 = null;
+
+                if (random.Next(100) < 50)
                 {
-                    // Pick random primary mood
-                    var primaryMood = allMoods[random.Next(allMoods.Count)];
-                    
-                    // Maybe add secondary moods (50% chance for first, 30% for second)
-                    MoodType? secondaryMood1 = null;
-                    MoodType? secondaryMood2 = null;
-                    
-                    if (random.Next(100) < 50)
+                    do { secondaryMood1 = allMoods[random.Next(allMoods.Count)]; }
+                    while (secondaryMood1 == primaryMood);
+
+                    if (random.Next(100) < 30)
                     {
-                        do { secondaryMood1 = allMoods[random.Next(allMoods.Count)]; }
-                        while (secondaryMood1 == primaryMood);
-                        
-                        if (random.Next(100) < 30)
-                        {
-                            do { secondaryMood2 = allMoods[random.Next(allMoods.Count)]; }
-                            while (secondaryMood2 == primaryMood || secondaryMood2 == secondaryMood1);
-                        }
+                        do { secondaryMood2 = allMoods[random.Next(allMoods.Count)]; }
+                        while (secondaryMood2 == primaryMood || secondaryMood2 == secondaryMood1);
                     }
-                    
-                    // Pick random title
-                    var title = titles[random.Next(titles.Count)];
-                    
-                    // Build content (2-4 paragraphs)
-                    var numParagraphs = random.Next(2, 5);
-                    var usedParagraphs = new HashSet<int>();
-                    var contentBuilder = new System.Text.StringBuilder();
-                    
-                    for (int p = 0; p < numParagraphs; p++)
-                    {
-                        int paragraphIndex;
-                        do { paragraphIndex = random.Next(contentParagraphs.Count); }
-                        while (usedParagraphs.Contains(paragraphIndex) && usedParagraphs.Count < contentParagraphs.Count);
-                        
-                        usedParagraphs.Add(paragraphIndex);
-                        contentBuilder.AppendLine($"<p>{contentParagraphs[paragraphIndex]}</p>");
-                    }
-                    
-                    // Pick random tags (1-4 tags)
-                    var numTags = random.Next(1, 5);
-                    var selectedTags = allTags.OrderBy(_ => random.Next()).Take(numTags).ToList();
-                    
-                    // Create the entry
-                    var entry = new JournalEntry
-                    {
-                        Title = title,
-                        Content = contentBuilder.ToString(),
-                        EntryDate = entryDate,
-                        PrimaryMood = primaryMood,
-                        SecondaryMood1 = secondaryMood1,
-                        SecondaryMood2 = secondaryMood2,
-                        IsFavorite = random.Next(100) < 15, // 15% chance of being favorite
-                        IsPinned = random.Next(100) < 10,   // 10% chance of being pinned
-                        IsArchived = false,
-                        Tags = selectedTags
-                    };
-                    
-                    // Set created time to a random time during that day
-                    var hour = e == 0 ? random.Next(7, 12) : (e == 1 ? random.Next(14, 18) : random.Next(19, 23));
-                    var minute = random.Next(0, 60);
-                    entry.CreatedAt = entryDate.ToDateTime(new TimeOnly(hour, minute));
-                    entry.UpdatedAt = entry.CreatedAt;
-                    
-                    await JournalService.CreateEntryAsync(entry);
-                    entriesCreated++;
                 }
+
+                var title = titles[random.Next(titles.Count)];
+
+                var numParagraphs = random.Next(2, 5);
+                var usedParagraphs = new HashSet<int>();
+                var contentBuilder = new System.Text.StringBuilder();
+
+                for (int p = 0; p < numParagraphs; p++)
+                {
+                    int paragraphIndex;
+                    do { paragraphIndex = random.Next(contentParagraphs.Count); }
+                    while (usedParagraphs.Contains(paragraphIndex) && usedParagraphs.Count < contentParagraphs.Count);
+
+                    usedParagraphs.Add(paragraphIndex);
+                    contentBuilder.AppendLine($"<p>{contentParagraphs[paragraphIndex]}</p>");
+                }
+
+                // tags
+                List<Tag> selectedTags = new();
+                if (allTags.Count > 0)
+                {
+                    var numTags = random.Next(1, Math.Min(5, allTags.Count + 1));
+                    selectedTags = allTags.OrderBy(_ => random.Next()).Take(numTags).ToList();
+                }
+
+                var entry = new JournalEntry
+                {
+                    Title = title,
+                    Content = contentBuilder.ToString(),
+                    EntryDate = entryDate,
+                    PrimaryMood = primaryMood,
+                    SecondaryMood1 = secondaryMood1,
+                    SecondaryMood2 = secondaryMood2,
+                    IsFavorite = random.Next(100) < 15,
+                    IsPinned = random.Next(100) < 10,
+                    IsArchived = false,
+                    Tags = selectedTags
+                };
+
+                // random time in that day
+                var hour = random.Next(7, 23);
+                var minute = random.Next(0, 60);
+                entry.CreatedAt = entryDate.ToDateTime(new TimeOnly(hour, minute));
+                entry.UpdatedAt = entry.CreatedAt;
+
+                await JournalService.CreateEntryAsync(entry);
+                entriesCreated++;
             }
-            
+
             DemoMessage = $"Successfully created {entriesCreated} demo journal entries!";
             DemoSuccess = true;
         }
@@ -787,4 +796,3 @@
         }
     }
 }
-

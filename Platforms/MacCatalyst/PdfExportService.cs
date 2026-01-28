@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using CoreGraphics;
 using Foundation;
+using Microsoft.Maui.ApplicationModel;
 using UIKit;
 using whitespc.Models;
 using whitespc.Services;
@@ -10,48 +11,57 @@ namespace whitespc.Platforms.MacCatalyst;
 
 public sealed class PdfExportService : IPdfExportService
 {
-    public byte[] ExportToPdf(IReadOnlyList<JournalEntry> entries, string title)
+    public async Task<byte[]> ExportToPdfAsync(IReadOnlyList<JournalEntry> entries, string title)
     {
-        // A4 size in points (72 dpi): 595 x 842
-        var pageRect = new CGRect(0, 0, 595, 842);
+        // ✅ Safe: can run anywhere (no UIKit here)
+        var safeTitle = title ?? "";
+        var prepared = entries
+            .Select(e => new PreparedEntry(
+                e.EntryDate,                 // DateOnly ✅
+                e.Title ?? "",
+                HtmlToPlainText(e.Content ?? "")
+            ))
+            .ToList();
 
-        // ✅ FIX: MacCatalyst/.NET 9 binding requires the (CGRect, UIGraphicsPdfRendererFormat) constructor
-        var format = new UIGraphicsPdfRendererFormat();
-        var renderer = new UIGraphicsPdfRenderer(pageRect, format);
-
-        using var data = renderer.CreatePdf(ctx =>
+        // ✅ REQUIRED: UIKit drawing must run on UI thread
+        return await MainThread.InvokeOnMainThreadAsync(() =>
         {
-            ctx.BeginPage();
+            var pageRect = new CGRect(0, 0, 595, 842); // A4
+            var format = new UIGraphicsPdfRendererFormat();
+            var renderer = new UIGraphicsPdfRenderer(pageRect, format);
 
-            var margin = 40;
-            nfloat y = margin;
-            var contentWidth = pageRect.Width - margin * 2;
-
-            // Title
-            y = DrawLine(title, UIFont.BoldSystemFontOfSize(18), margin, y, contentWidth);
-            y += 10;
-
-            foreach (var e in entries)
+            using var data = renderer.CreatePdf(ctx =>
             {
-                var header = $"{e.EntryDate:yyyy-MM-dd}  •  {e.Title}";
-                y = DrawLine(header, UIFont.BoldSystemFontOfSize(12), margin, y, contentWidth);
+                ctx.BeginPage();
 
-                var plain = HtmlToPlainText(e.Content ?? "");
-                y = DrawParagraph(plain, UIFont.SystemFontOfSize(11), margin, y, contentWidth);
+                var margin = 40;
+                nfloat y = margin;
+                var contentWidth = pageRect.Width - margin * 2;
 
-                y += 14;
+                y = DrawLine(safeTitle, UIFont.BoldSystemFontOfSize(18), margin, y, contentWidth);
+                y += 10;
 
-                // New page if needed
-                if (y > pageRect.Height - margin)
+                foreach (var e in prepared)
                 {
-                    ctx.BeginPage();
-                    y = margin;
-                }
-            }
-        });
+                    var header = $"{e.Date:yyyy-MM-dd}  •  {e.Title}";
+                    y = DrawLine(header, UIFont.BoldSystemFontOfSize(12), margin, y, contentWidth);
 
-        return data.ToArray();
+                    y = DrawParagraph(e.Body, UIFont.SystemFontOfSize(11), margin, y, contentWidth);
+                    y += 14;
+
+                    if (y > pageRect.Height - margin)
+                    {
+                        ctx.BeginPage();
+                        y = margin;
+                    }
+                }
+            });
+
+            return data.ToArray();
+        });
     }
+
+    private sealed record PreparedEntry(DateOnly Date, string Title, string Body);
 
     private static nfloat DrawLine(string text, UIFont font, nfloat x, nfloat y, nfloat width)
     {
@@ -93,17 +103,11 @@ public sealed class PdfExportService : IPdfExportService
 
     private static string HtmlToPlainText(string html)
     {
-        // Decode entities
         var decoded = WebUtility.HtmlDecode(html);
-
-        // Remove tags (simple)
         decoded = Regex.Replace(decoded, "<.*?>", string.Empty);
-
-        // Normalize whitespace
         decoded = Regex.Replace(decoded, @"\s+\n", "\n");
         decoded = Regex.Replace(decoded, @"\n\s+", "\n");
         decoded = Regex.Replace(decoded, @"[ \t]{2,}", " ");
-
         return decoded.Trim();
     }
 }

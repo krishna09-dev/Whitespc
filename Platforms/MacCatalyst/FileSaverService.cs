@@ -1,74 +1,74 @@
-#if MACCATALYST
 using Foundation;
 using UIKit;
-using UniformTypeIdentifiers;
+using Microsoft.Maui.ApplicationModel;
+using whitespc.Services;
 
-namespace whitespc.Services;
+namespace whitespc.Platforms.MacCatalyst;
 
-public partial class FileSaverService : IFileSaverService
+public class FileSaverService : IFileSaverService
 {
-    public async Task<FileSaveResult> SaveFileAsync(string defaultFileName, byte[] data, string mimeType = "application/pdf")
+    public async Task<FileSaveResult> SaveFileAsync(
+        string defaultFileName,
+        byte[] data,
+        string mimeType = "application/pdf")
     {
-        var tcs = new TaskCompletionSource<FileSaveResult>();
-        
         try
         {
-            // Save to temp file first
+            // Save the bytes FIRST (this can be background)
             var tempPath = Path.Combine(FileSystem.CacheDirectory, defaultFileName);
             await File.WriteAllBytesAsync(tempPath, data);
-            
             var tempUrl = NSUrl.FromFilename(tempPath);
-            
-            // Create document picker in export mode (move to location)
-            var documentPicker = new UIDocumentPickerViewController(new[] { tempUrl }, UIDocumentPickerMode.ExportToService);
-            
-            documentPicker.DidPickDocumentAtUrls += (sender, e) =>
+
+            // Everything UIKit must be on main thread
+            return await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                if (e.Urls?.Length > 0)
+                var tcs = new TaskCompletionSource<FileSaveResult>();
+
+                var picker = new UIDocumentPickerViewController(
+                    new[] { tempUrl },
+                    UIDocumentPickerMode.ExportToService
+                );
+
+                picker.DidPickDocumentAtUrls += (_, e) =>
                 {
-                    var destUrl = e.Urls[0];
-                    tcs.TrySetResult(new FileSaveResult(true, destUrl.Path));
-                }
-                else
+                    var picked = e.Urls?.FirstOrDefault();
+                    tcs.TrySetResult(new FileSaveResult(true, picked?.Path, null));
+                };
+
+                picker.WasCancelled += (_, __) =>
                 {
-                    tcs.TrySetResult(new FileSaveResult(false, null, "No destination selected"));
-                }
-            };
-            
-            documentPicker.WasCancelled += (sender, e) =>
-            {
-                tcs.TrySetResult(new FileSaveResult(false, null, "Save cancelled"));
-            };
-            
-            // Present the picker
-            var window = UIApplication.SharedApplication.KeyWindow 
-                ?? UIApplication.SharedApplication.Windows.FirstOrDefault();
-            var viewController = window?.RootViewController;
-            
-            if (viewController != null)
-            {
-                // Find the topmost presented controller
-                while (viewController.PresentedViewController != null)
-                {
-                    viewController = viewController.PresentedViewController;
-                }
-                
-                await MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    await viewController.PresentViewControllerAsync(documentPicker, true);
-                });
-            }
-            else
-            {
-                tcs.TrySetResult(new FileSaveResult(false, null, "Could not find view controller"));
-            }
+                    tcs.TrySetResult(new FileSaveResult(false, null, "Export cancelled"));
+                };
+
+                var vc = GetTopViewController();
+                if (vc == null)
+                    return new FileSaveResult(false, null, "No active window");
+
+                vc.PresentViewController(picker, true, null);
+
+                return await tcs.Task;
+            });
         }
         catch (Exception ex)
         {
-            tcs.TrySetResult(new FileSaveResult(false, null, ex.Message));
+            return new FileSaveResult(false, null, ex.ToString());
         }
-        
-        return await tcs.Task;
+    }
+
+    private static UIViewController? GetTopViewController()
+    {
+        var window = UIApplication.SharedApplication
+            .ConnectedScenes
+            .OfType<UIWindowScene>()
+            .SelectMany(s => s.Windows)
+            .FirstOrDefault(w => w.IsKeyWindow);
+
+        var root = window?.RootViewController;
+        if (root == null) return null;
+
+        while (root.PresentedViewController != null)
+            root = root.PresentedViewController;
+
+        return root;
     }
 }
-#endif
