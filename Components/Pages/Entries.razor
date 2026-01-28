@@ -1,0 +1,529 @@
+﻿@page "/entries"
+@inject JournalService JournalService
+@inject TagService TagService
+
+<PageTitle>Entries - Whitespc</PageTitle>
+
+<div class="space-y-6 page-enter">
+    <!-- Header with Tabs -->
+    <div class="flex items-center justify-between animate-fade-in-up">
+        <div class="flex items-center gap-4">
+            <button @onclick='() => SetActiveTab("all")' 
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all btn-press @(ActiveTab == "all" ? "bg-primary-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700")">
+                All Entries
+            </button>
+            <button @onclick='() => SetActiveTab("favorites")' 
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all btn-press flex items-center gap-2 @(ActiveTab == "favorites" ? "bg-amber-500 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700")">
+                <svg class="w-4 h-4" fill="@(ActiveTab == "favorites" ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                </svg>
+                Favorites
+            </button>
+            <button @onclick='() => SetActiveTab("archived")' 
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all btn-press flex items-center gap-2 @(ActiveTab == "archived" ? "bg-slate-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700")">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                </svg>
+                Archived
+            </button>
+        </div>
+        <span class="text-sm text-slate-500 dark:text-slate-400 animate-fade-in">@TotalEntries entries</span>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 animate-fade-in-up stagger-1 hover-lift">
+        <div class="flex flex-wrap gap-4">
+            <!-- Search -->
+            <div class="flex-1 min-w-[200px]">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" @bind="SearchTerm" @bind:event="oninput" @onkeyup="OnSearchKeyUp" placeholder="Search entries..."
+                           class="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent text-slate-800 dark:text-slate-200 transition-all" />
+                </div>
+            </div>
+
+            <!-- Date Range -->
+            <div class="flex gap-2 items-center">
+                <div class="relative">
+                    <input type="date" @bind="StartDate" 
+                           class="px-3 py-2 pr-10 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 date-input" />
+                </div>
+                <span class="self-center text-slate-400">to</span>
+                <div class="relative">
+                    <input type="date" @bind="EndDate" 
+                           class="px-3 py-2 pr-10 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 date-input" />
+                </div>
+            </div>
+
+            <!-- Mood Filter -->
+            <select @bind="SelectedMoodFilter" class="px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200">
+                <option value="">All Moods</option>
+                <option value="Positive">Positive 😊</option>
+                <option value="Neutral">Neutral 😐</option>
+                <option value="Negative">Negative 😞</option>
+            </select>
+
+            <!-- Apply/Clear -->
+            <div class="flex gap-2">
+                <button @onclick="ApplyFilters" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm transition-colors">
+                    Apply
+                </button>
+                <button @onclick="ClearFilters" class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entries List -->
+    @if (IsLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+    }
+    else if (!JournalEntries.Any())
+    {
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center">
+            <div class="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
+                @(ActiveTab == "favorites" ? "No favorite entries" : ActiveTab == "archived" ? "No archived entries" : "No entries found")
+            </h3>
+            <p class="text-slate-500 dark:text-slate-400">
+                @(ActiveTab == "favorites" ? "Star entries to add them to favorites" : ActiveTab == "archived" ? "Archive entries to keep them here" : "Try adjusting your filters or start writing!")
+            </p>
+        </div>
+    }
+    else
+    {
+    <div class="space-y-3">
+            @foreach (var entry in JournalEntries)
+            {
+                <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 cursor-pointer" @onclick="() => ViewEntry(entry)">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">@entry.PrimaryMood.GetEmoji()</span>
+                                <h3 class="font-medium text-slate-800 dark:text-slate-100">@entry.Title</h3>
+                                @if (entry.IsFavorite)
+                                {
+                                    <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                    </svg>
+                                }
+                                @if (entry.IsPinned)
+                                {
+                                    <svg class="w-4 h-4 text-primary-500" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2m4-2a2 2 0 012 2v2H8V4a2 2 0 012-2z"/>
+                                    </svg>
+                                }
+                            </div>
+                            <div class="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-2">@GetPreviewText(entry.Content)</div>
+                            <p class="text-xs text-slate-400">@entry.EntryDate.ToString("MMMM d, yyyy") • @entry.CreatedAt.ToString("h:mm tt")</p>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex items-center gap-1 ml-4">
+                            <button @onclick="() => ViewEntry(entry)" @onclick:stopPropagation title="View"
+                                    class="p-2 text-slate-400 hover:text-primary-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                            <button @onclick="() => ToggleFavorite(entry)" @onclick:stopPropagation title="@(entry.IsFavorite ? "Remove from favorites" : "Add to favorites")" 
+                                    class="p-2 @(entry.IsFavorite ? "text-amber-500" : "text-slate-400 hover:text-amber-500") hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="@(entry.IsFavorite ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                </svg>
+                            </button>
+                            <button @onclick="() => TogglePin(entry)" @onclick:stopPropagation title="@(entry.IsPinned ? "Unpin" : "Pin")"
+                                    class="p-2 @(entry.IsPinned ? "text-primary-500" : "text-slate-400 hover:text-primary-500") hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="@(entry.IsPinned ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                                </svg>
+                            </button>
+                            <button @onclick="() => ToggleArchive(entry)" @onclick:stopPropagation title="@(entry.IsArchived ? "Unarchive" : "Archive")"
+                                    class="p-2 @(entry.IsArchived ? "text-slate-600" : "text-slate-400 hover:text-slate-600") hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="@(entry.IsArchived ? "currentColor" : "none")" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                </svg>
+                            </button>
+                            <button @onclick="() => ConfirmDelete(entry)" @onclick:stopPropagation title="Delete"
+                                    class="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Pagination -->
+        @if (TotalPages > 1)
+        {
+            <div class="flex items-center justify-center gap-2 pt-4">
+                <button @onclick="PreviousPage" disabled="@(CurrentPage == 1)"
+                        class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                    Previous
+                </button>
+                
+                @for (int i = 1; i <= TotalPages && i <= 5; i++)
+                {
+                    var pageNum = i;
+                    <button @onclick="() => GoToPage(pageNum)"
+                            class="w-10 h-10 @(CurrentPage == pageNum ? "bg-primary-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700") rounded-lg text-sm transition-colors">
+                        @pageNum
+                    </button>
+                }
+                
+                @if (TotalPages > 5)
+                {
+                    <span class="px-2 text-slate-400">...</span>
+                    <button @onclick="() => GoToPage(TotalPages)"
+                            class="w-10 h-10 @(CurrentPage == TotalPages ? "bg-primary-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700") rounded-lg text-sm transition-colors">
+                        @TotalPages
+                    </button>
+                }
+                
+                <button @onclick="NextPage" disabled="@(CurrentPage == TotalPages)"
+                        class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                    Next
+                </button>
+            </div>
+        }
+    }
+</div>
+
+<!-- Entry View Modal -->
+@if (SelectedEntry != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @onclick="CloseEntryView">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4" @onclick:stopPropagation>
+            <!-- Header -->
+            <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">@SelectedEntry.Title</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        @SelectedEntry.EntryDate.ToString("dddd, MMMM d, yyyy") at @SelectedEntry.CreatedAt.ToString("h:mm tt")
+                    </p>
+                </div>
+                <button @onclick="CloseEntryView" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Content -->
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <!-- Moods Section -->
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Moods</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/30 rounded-full">
+                            <span class="text-xl">@GetMoodEmoji(SelectedEntry.PrimaryMood)</span>
+                            <span class="text-sm text-primary-700 dark:text-primary-300 font-medium">@SelectedEntry.PrimaryMood</span>
+                        </div>
+                        @if (SelectedEntry.SecondaryMood1.HasValue)
+                        {
+                            <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
+                                <span class="text-lg">@GetMoodEmoji(SelectedEntry.SecondaryMood1.Value)</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">@SelectedEntry.SecondaryMood1.Value</span>
+                            </div>
+                        }
+                        @if (SelectedEntry.SecondaryMood2.HasValue)
+                        {
+                            <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
+                                <span class="text-lg">@GetMoodEmoji(SelectedEntry.SecondaryMood2.Value)</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">@SelectedEntry.SecondaryMood2.Value</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                
+                <!-- Tags -->
+                @if (SelectedEntry.Tags?.Any() == true)
+                {
+                    <div class="mb-6">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Tags</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach (var tag in SelectedEntry.Tags)
+                            {
+                                <span class="px-3 py-1 text-sm rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                                    @tag.Name
+                                </span>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                <!-- Entry Content -->
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Content</p>
+                    <div class="prose prose-slate dark:prose-invert max-w-none">
+                        @((MarkupString)SelectedEntry.Content)
+                    </div>
+                </div>
+                
+                <!-- Meta Information -->
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="text-slate-400 dark:text-slate-500">Word Count</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium">@SelectedEntry.WordCount words</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 dark:text-slate-500">Last Updated</p>
+                            <p class="text-slate-700 dark:text-slate-300 font-medium">@SelectedEntry.UpdatedAt.ToString("MMM d, yyyy h:mm tt")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <div class="flex items-center justify-end gap-2">
+                    <button @onclick="CloseEntryView" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (ShowDeleteConfirm && EntryToDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @onclick="() => ShowDeleteConfirm = false">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-6 m-4" @onclick:stopPropagation>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Delete Entry?</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mb-6">This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button @onclick="() => ShowDeleteConfirm = false" class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        Cancel
+                    </button>
+                    <button @onclick="DeleteEntry" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+private List<JournalEntry> JournalEntries { get; set; } = new();
+private bool IsLoading { get; set; } = true;
+private JournalEntry? SelectedEntry { get; set; }
+private JournalEntry? EntryToDelete { get; set; }
+private bool ShowDeleteConfirm { get; set; }
+private string ActiveTab { get; set; } = "all";
+    
+// Filters
+private string SearchTerm { get; set; } = "";
+private DateTime? StartDate { get; set; }
+private DateTime? EndDate { get; set; }
+private string SelectedMoodFilter { get; set; } = "";
+    
+// Pagination
+private int CurrentPage { get; set; } = 1;
+private int PageSize { get; set; } = 10;
+private int TotalEntries { get; set; }
+private int TotalPages => (int)Math.Ceiling((double)TotalEntries / PageSize);
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadEntriesAsync();
+}
+
+private async Task SetActiveTab(string tab)
+{
+    ActiveTab = tab;
+    CurrentPage = 1;
+    await LoadEntriesAsync();
+}
+
+private async Task LoadEntriesAsync()
+{
+    IsLoading = true;
+        
+    var startDate = StartDate.HasValue ? DateOnly.FromDateTime(StartDate.Value) : (DateOnly?)null;
+    var endDate = EndDate.HasValue ? DateOnly.FromDateTime(EndDate.Value) : (DateOnly?)null;
+        
+    List<MoodType>? moods = null;
+    if (!string.IsNullOrEmpty(SelectedMoodFilter))
+    {
+        var category = Enum.Parse<MoodCategory>(SelectedMoodFilter);
+        moods = Enum.GetValues<MoodType>().Where(m => m.GetCategory() == category).ToList();
+    }
+
+    // Filter by tab
+    bool? isFavorite = ActiveTab == "favorites" ? true : null;
+    bool? isArchived = ActiveTab == "archived" ? true : null;
+        
+    TotalEntries = await JournalService.GetTotalEntriesCountAsync(
+        startDate: startDate,
+        endDate: endDate,
+        moods: moods,
+        searchTerm: string.IsNullOrWhiteSpace(SearchTerm) ? null : SearchTerm,
+        isFavorite: isFavorite,
+        isArchived: isArchived
+    );
+        
+    JournalEntries = await JournalService.GetEntriesAsync(
+        startDate: startDate,
+        endDate: endDate,
+        moods: moods,
+        searchTerm: string.IsNullOrWhiteSpace(SearchTerm) ? null : SearchTerm,
+        page: CurrentPage,
+        pageSize: PageSize,
+        isFavorite: isFavorite,
+        isArchived: isArchived
+    );
+        
+    IsLoading = false;
+}
+
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplyFilters();
+        }
+    }
+
+
+    private async Task ApplyFilters()
+    {
+        CurrentPage = 1;
+        await LoadEntriesAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        SearchTerm = "";
+        StartDate = null;
+        EndDate = null;
+        SelectedMoodFilter = "";
+        CurrentPage = 1;
+        await LoadEntriesAsync();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (CurrentPage > 1)
+        {
+            CurrentPage--;
+            await LoadEntriesAsync();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (CurrentPage < TotalPages)
+        {
+            CurrentPage++;
+            await LoadEntriesAsync();
+        }
+    }
+
+
+    private async Task GoToPage(int page)
+    {
+        CurrentPage = page;
+        await LoadEntriesAsync();
+    }
+
+    private void ViewEntry(JournalEntry entry)
+    {
+        SelectedEntry = entry;
+    }
+
+    private void CloseEntryView()
+    {
+        SelectedEntry = null;
+    }
+
+    private async Task ToggleFavorite(JournalEntry entry)
+    {
+        entry.IsFavorite = !entry.IsFavorite;
+        await JournalService.UpdateEntryAsync(entry);
+        
+        // Refresh if on favorites tab and item was unfavorited
+        if (ActiveTab == "favorites" && !entry.IsFavorite)
+        {
+            await LoadEntriesAsync();
+        }
+    }
+
+    private async Task ToggleArchive(JournalEntry entry)
+    {
+        entry.IsArchived = !entry.IsArchived;
+        await JournalService.UpdateEntryAsync(entry);
+        
+        // Refresh list as archived entries may move to/from archived tab
+        await LoadEntriesAsync();
+    }
+
+    private async Task TogglePin(JournalEntry entry)
+    {
+        entry.IsPinned = !entry.IsPinned;
+        await JournalService.UpdateEntryAsync(entry);
+    }
+
+    private void ConfirmDelete(JournalEntry entry)
+    {
+        EntryToDelete = entry;
+        ShowDeleteConfirm = true;
+    }
+
+    private async Task DeleteEntry()
+    {
+        if (EntryToDelete != null)
+        {
+            await JournalService.DeleteEntryAsync(EntryToDelete.Id);
+            JournalEntries.Remove(EntryToDelete);
+            EntryToDelete = null;
+            ShowDeleteConfirm = false;
+            TotalEntries--;
+        }
+    }
+
+    private string GetMoodEmoji(MoodType mood)
+    {
+        return mood.GetEmoji();
+    }
+
+    private string GetPreviewText(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "";
+        
+        var text = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]+>", " ");
+        text = System.Net.WebUtility.HtmlDecode(text);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+        
+        if (text.Length > 150)
+        {
+            text = text.Substring(0, 150) + "...";
+        }
+        
+        return text;
+    }
+}
