@@ -1,0 +1,378 @@
+@inject SecurityService SecurityService
+@inject ThemeService ThemeService
+
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+    <!-- Background Animation -->
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl animate-float"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-700/20 rounded-full blur-3xl animate-float" style="animation-delay: 1.5s;"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-600/10 rounded-full blur-3xl animate-pulse-soft"></div>
+    </div>
+
+    <div class="relative w-full max-w-lg mx-4 animate-fade-in-up">
+        <!-- Progress Indicator -->
+        <div class="flex justify-center gap-2 mb-8">
+            @for (int i = 1; i <= TotalSteps; i++)
+            {
+                var step = i;
+                <div class="h-2 rounded-full transition-all duration-500 ease-out @(step <= CurrentStep ? "bg-primary-500 w-8" : "bg-white/20 w-2")"></div>
+            }
+        </div>
+
+        <!-- Content Card -->
+        <div class="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            @switch (CurrentStep)
+            {
+                case 1:
+                    <!-- Welcome -->
+                    <div class="text-center" @key="@CurrentStep">
+                        <div class="w-24 h-24 bg-gradient-to-br from-primary-500 to-primary-700 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-primary-500/30 mb-6 animate-bounce-subtle">
+                            <span class="text-white font-bold text-4xl">W</span>
+                        </div>
+                        <h1 class="text-3xl font-bold text-white mb-3 animate-fade-in-up stagger-1">Welcome to Whitespc</h1>
+                        <p class="text-slate-300 mb-8 leading-relaxed animate-fade-in-up stagger-2">
+                            Your personal space for reflection, growth, and self-discovery. Let's set up your journal in just a few steps.
+                        </p>
+                        <button @onclick="NextStep" class="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold text-lg transition-all hover:scale-[1.02] btn-press ripple animate-fade-in-up stagger-3">
+                            Get Started
+                        </button>
+                    </div>
+                    break;
+
+                case 2:
+                    <!-- Create PIN -->
+                    <div class="text-center" @key="@CurrentStep">
+                        <div class="w-16 h-16 bg-primary-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-scale-up">
+                            <svg class="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-white mb-2 animate-fade-in-up stagger-1">Secure Your Journal</h2>
+                        <p class="text-slate-400 mb-6 animate-fade-in-up stagger-2">Create a 5-digit PIN to protect your private thoughts</p>
+                        
+                        @if (!string.IsNullOrEmpty(StepError))
+                        {
+                            <div class="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm animate-wiggle">
+                                @StepError
+                            </div>
+                        }
+                        
+                        <div class="space-y-4 mb-6 animate-fade-in-up stagger-3">
+                            <div>
+                                <div class="relative w-48 mx-auto">
+                                    <input type="password" @bind="NewPin" @bind:event="oninput" maxlength="5" inputmode="numeric" pattern="[0-9]*"
+                                           @onfocus="() => IsNewPinFocused = true"
+                                           @onblur="() => IsNewPinFocused = false"
+                                           class="absolute inset-0 w-full h-full opacity-0 z-10"
+                                           style="caret-color: transparent;" />
+                                    <!-- Visual PIN dots -->
+                                    <div class="flex justify-center gap-3 py-4 bg-white/5 border-2 rounded-xl transition-all duration-200 @(IsNewPinFocused ? "border-primary-500" : "border-white/10")">
+                                        @for (int i = 0; i < 5; i++)
+                                        {
+                                            var filled = i < NewPin.Length;
+                                            <div class="w-4 h-4 rounded-full border-2 transition-all duration-200 @(filled ? "bg-primary-500 border-primary-500" : "border-slate-500")"></div>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="text-slate-500 text-xs mt-2 text-center">Enter 5-digit PIN</p>
+                            </div>
+                            <div>
+                                <div class="relative w-48 mx-auto">
+                                    <input type="password" @bind="ConfirmPin" @bind:event="oninput" maxlength="5" inputmode="numeric" pattern="[0-9]*"
+                                           @onfocus="() => IsConfirmPinFocused = true"
+                                           @onblur="() => IsConfirmPinFocused = false"
+                                           class="absolute inset-0 w-full h-full opacity-0 z-10"
+                                           style="caret-color: transparent;" />
+                                    <!-- Visual PIN dots -->
+                                    <div class="flex justify-center gap-3 py-4 bg-white/5 border-2 rounded-xl transition-all duration-200 @(IsConfirmPinFocused ? "border-primary-500" : "border-white/10")">
+                                        @for (int i = 0; i < 5; i++)
+                                        {
+                                            var filled = i < ConfirmPin.Length;
+                                            <div class="w-4 h-4 rounded-full border-2 transition-all duration-200 @(filled ? "bg-primary-500 border-primary-500" : "border-slate-500")"></div>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="text-slate-500 text-xs mt-2 text-center">Confirm PIN</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 animate-fade-in-up stagger-4">
+                            <button @onclick="SkipPin" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-medium transition-all btn-press">
+                                Skip for Now
+                            </button>
+                            <button @onclick="SavePin" class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all btn-press ripple">
+                                Set PIN
+                            </button>
+                        </div>
+                    </div>
+                    break;
+
+                case 3:
+                    <!-- Security Questions -->
+                    <div @key="@CurrentStep">
+                        <div class="text-center mb-6">
+                            <div class="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-scale-up">
+                                <svg class="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-bold text-white mb-2 animate-fade-in-up stagger-1">Recovery Questions</h2>
+                            <p class="text-slate-400 text-sm animate-fade-in-up stagger-2">In case you forget your PIN, answer these to recover access</p>
+                        </div>
+                        
+                        @if (!string.IsNullOrEmpty(StepError))
+                        {
+                            <div class="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm animate-wiggle">
+                                @StepError
+                            </div>
+                        }
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="animate-fade-in-up stagger-3">
+                                <select @bind="Question1" class="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" style="color-scheme: dark;">
+                                    <option value="" class="bg-slate-800 text-white">Select a question...</option>
+                                    @foreach (var q in SecurityQuestions.Where(q => q != Question2 && q != Question3))
+                                    {
+                                        <option value="@q" class="bg-slate-800 text-white">@q</option>
+                                    }
+                                </select>
+                                <input type="text" @bind="Answer1" class="w-full mt-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" placeholder="Your answer" />
+                            </div>
+                            <div class="animate-fade-in-up stagger-4">
+                                <select @bind="Question2" class="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" style="color-scheme: dark;">
+                                    <option value="" class="bg-slate-800 text-white">Select a question...</option>
+                                    @foreach (var q in SecurityQuestions.Where(q => q != Question1 && q != Question3))
+                                    {
+                                        <option value="@q" class="bg-slate-800 text-white">@q</option>
+                                    }
+                                </select>
+                                <input type="text" @bind="Answer2" class="w-full mt-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" placeholder="Your answer" />
+                            </div>
+                            <div class="animate-fade-in-up stagger-5">
+                                <select @bind="Question3" class="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" style="color-scheme: dark;">
+                                    <option value="" class="bg-slate-800 text-white">Select a question...</option>
+                                    @foreach (var q in SecurityQuestions.Where(q => q != Question1 && q != Question2))
+                                    {
+                                        <option value="@q" class="bg-slate-800 text-white">@q</option>
+                                    }
+                                </select>
+                                <input type="text" @bind="Answer3" class="w-full mt-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all" placeholder="Your answer" />
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 animate-fade-in-up stagger-6">
+                            @if (!HasSetPin)
+                            {
+                                <button @onclick="SkipQuestions" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-medium transition-all btn-press">
+                                    Skip
+                                </button>
+                            }
+                            <button @onclick="SaveSecurityQuestions" class="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all btn-press ripple">
+                                @(HasSetPin ? "Save & Continue" : "Save")
+                            </button>
+                        </div>
+                    </div>
+                    break;
+
+                case 4:
+                    <!-- Preferences -->
+                    <div @key="@CurrentStep">
+                        <div class="text-center mb-6">
+                            <div class="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-bold text-white mb-2">Personalize</h2>
+                            <p class="text-slate-400 text-sm">Make Whitespc feel like yours</p>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <!-- Theme -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-3">Theme</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button @onclick="SelectLightTheme" class="p-4 rounded-xl border-2 transition-all @(!SelectedTheme ? "border-primary-500 bg-primary-500/10" : "border-white/10 bg-white/5 hover:bg-white/10")">
+                                        <div class="w-8 h-8 bg-white rounded-lg mx-auto mb-2 flex items-center justify-center">
+                                            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Light</span>
+                                    </button>
+                                    <button @onclick="SelectDarkTheme" class="p-4 rounded-xl border-2 transition-all @(SelectedTheme ? "border-primary-500 bg-primary-500/10" : "border-white/10 bg-white/5 hover:bg-white/10")">
+                                        <div class="w-8 h-8 bg-slate-800 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                                            <svg class="w-5 h-5 text-indigo-300" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Dark</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Daily Motivation -->
+                            <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                                <div>
+                                    <p class="text-white font-medium">Daily Motivation</p>
+                                    <p class="text-slate-400 text-sm">Show inspiring quotes on lock screen</p>
+                                </div>
+                                <button @onclick="() => ShowMotivation = !ShowMotivation" 
+                                        class="relative w-12 h-7 rounded-full transition-colors @(ShowMotivation ? "bg-primary-600" : "bg-white/20")">
+                                    <div class="absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform @(ShowMotivation ? "translate-x-5" : "")"></div>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button @onclick="NextStep" class="w-full mt-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors">
+                            Continue
+                        </button>
+                    </div>
+                    break;
+
+                case 5:
+                    <!-- Finish -->
+                    <div class="text-center" @key="@CurrentStep">
+                        <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up">
+                            <svg class="w-10 h-10 text-green-400 animate-bounce-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-white mb-3 animate-fade-in-up stagger-1">You're All Set!</h2>
+                        <p class="text-slate-400 mb-8 leading-relaxed animate-fade-in-up stagger-2">
+                            Your journal is ready. Start capturing your thoughts, tracking your moods, and reflecting on your journey.
+                        </p>
+                        <button @onclick="FinishOnboarding" class="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold text-lg transition-all hover:scale-[1.02] btn-press ripple animate-fade-in-up stagger-3 hover-glow">
+                            Start Journaling
+                        </button>
+                    </div>
+                    break;
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+[Parameter] public EventCallback OnComplete { get; set; }
+    
+private int CurrentStep { get; set; } = 1;
+private int TotalSteps { get; set; } = 5;
+private string StepError { get; set; } = "";
+    
+// PIN
+private string NewPin { get; set; } = "";
+private string ConfirmPin { get; set; } = "";
+private bool HasSetPin { get; set; } = false;
+private bool IsNewPinFocused { get; set; } = false;
+private bool IsConfirmPinFocused { get; set; } = false;
+    
+// Security Questions
+    private string Question1 { get; set; } = "";
+    private string Question2 { get; set; } = "";
+    private string Question3 { get; set; } = "";
+    private string Answer1 { get; set; } = "";
+    private string Answer2 { get; set; } = "";
+    private string Answer3 { get; set; } = "";
+    
+    private static readonly List<string> SecurityQuestions = new()
+    {
+        "What was the name of your first pet?",
+        "What city were you born in?",
+        "What was your childhood nickname?",
+        "What is your mother's maiden name?",
+        "What was the name of your first school?",
+        "What is your favorite book?",
+        "What was your first car?",
+        "What is your favorite movie?",
+        "What street did you grow up on?",
+        "What is your favorite food?"
+    };
+    
+    // Preferences
+    private bool SelectedTheme { get; set; } = false; // false = light mode (default)
+    private bool ShowMotivation { get; set; } = true;
+
+    private void NextStep()
+    {
+        StepError = "";
+        CurrentStep++;
+    }
+
+    private async Task SelectLightTheme()
+    {
+        SelectedTheme = false;
+        await ThemeService.SetDarkModeAsync(false);
+    }
+
+    private async Task SelectDarkTheme()
+    {
+        SelectedTheme = true;
+        await ThemeService.SetDarkModeAsync(true);
+    }
+
+    private async Task SavePin()
+    {
+        StepError = "";
+        
+        if (NewPin.Length != 5)
+        {
+            StepError = "PIN must be exactly 5 digits";
+            return;
+        }
+        
+        if (NewPin != ConfirmPin)
+        {
+            StepError = "PINs do not match";
+            return;
+        }
+        
+        await SecurityService.SetPinAsync(NewPin);
+        HasSetPin = true;
+        SecurityService.Unlock();
+        NextStep();
+    }
+
+    private void SkipPin()
+    {
+        HasSetPin = false;
+        // Skip to preferences if no PIN
+        CurrentStep = 4;
+    }
+
+    private async Task SaveSecurityQuestions()
+    {
+        StepError = "";
+        
+        if (HasSetPin)
+        {
+            if (string.IsNullOrWhiteSpace(Question1) || string.IsNullOrWhiteSpace(Answer1) ||
+                string.IsNullOrWhiteSpace(Question2) || string.IsNullOrWhiteSpace(Answer2) ||
+                string.IsNullOrWhiteSpace(Question3) || string.IsNullOrWhiteSpace(Answer3))
+            {
+                StepError = "Please complete all security questions";
+                return;
+            }
+            
+            await SecurityService.SetSecurityQuestionsAsync(
+                Question1, Answer1,
+                Question2, Answer2,
+                Question3, Answer3);
+        }
+        
+        NextStep();
+    }
+
+    private void SkipQuestions()
+    {
+        CurrentStep = 4;
+    }
+
+    private async Task FinishOnboarding()
+    {
+        await SecurityService.SetDarkModeAsync(SelectedTheme);
+        await SecurityService.SetShowDailyMotivationAsync(ShowMotivation);
+        await ThemeService.SetDarkModeAsync(SelectedTheme);
+        await SecurityService.CompleteOnboardingAsync();
+        await OnComplete.InvokeAsync();
+    }
+}
