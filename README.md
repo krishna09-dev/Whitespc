@@ -2,7 +2,7 @@
 
 **Whitespc** is a **.NET MAUI Blazor Hybrid desktop application** built for **private, offline personal journaling**.  
 All data stays **on your device** — no cloud, no accounts, no internet required.
-
+ 
 ---
 
 ## ✨ Features
