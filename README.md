@@ -5,6 +5,7 @@ All data stays **on your device** — no cloud, no accounts, no internet require
 
 ---
 
+
 ## ✨ Features
 - 📅 One journal entry per day
 - 😊 Mood tracking (primary + secondary)
